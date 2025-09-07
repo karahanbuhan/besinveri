@@ -1,6 +1,6 @@
 FROM rust:1.85-alpine
 
-# OpenSSL-Dev, Rust kütüphanelerinin bazı özellikleri için gerekmektedir.
+# OpenSSL, kütüphanelerin çalışması için gerekmektedir.
 RUN apk add openssl-dev musl-dev
 
 WORKDIR /app
