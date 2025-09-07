@@ -1,0 +1,43 @@
+[
+     {
+        "description": "Havuç",
+        "image_url": "/images/foods/havuc.webp",
+        "tags": [
+            "sebze",
+            "lif",
+            "sulu",
+            "yaz",
+            "diyet",
+            "turuncu"
+        ],
+        "allergens": [],
+        "servings": {
+            "Adet (Büyük)": 120,
+            "Adet (Orta)": 60,
+            "Adet (Küçük)": 40,
+            "Porsiyon (Orta)": 80,
+            "Yarım (Orta)": 30
+        },
+        "glycemic_index": 34,
+        "energy": 41,
+        "carbohydrate": 10,
+        "protein": 0.9,
+        "fat": 0.2,
+        "fiber": 2.8,
+        "cholesterol": 0,
+        "sodium": 69,
+        "potassium": 320,
+        "iron": 0.3,
+        "magnesium": 12,
+        "calcium": 33,
+        "zinc": 0.24,
+        "vitamin_a": 0.84,
+        "vitamin_b6": 0.14,
+        "vitamin_b12": 0,
+        "vitamin_c": 5.9,
+        "vitamin_d": 0,
+        "vitamin_e": 0.66,
+        "vitamin_k": 0.013,
+        "source": "karahanbuhan"
+    }
+]
