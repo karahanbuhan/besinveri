@@ -1,0 +1,12 @@
+[package]
+name = "besinveri"
+version = "0.1.0"
+authors = ["Karahan Buhan"]
+edition = "2024"
+description = "Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan açık ve ücretsiz bir API."
+readme = "README.md"
+homepage = "https://besinveri.com"
+repository = "https://github.com/karahanbuhan/besinveri"
+license = "MIT"
+
+[dependencies]
