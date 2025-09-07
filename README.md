@@ -3,7 +3,7 @@ Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan a
 
 #### Şu anda geliştirme aşamasındadır ve kullanıma hazır değildir. API aktif olduğunda burası güncellenecektir.
 
-## Gereksinimler
+## Kurulum Gereksinimler
 - [Git](https://git-scm.com/downloads)
 - [Rust Programlama Dili ve Cargo](https://www.rust-lang.org/tools/install)
 
