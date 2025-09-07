@@ -5,7 +5,7 @@ struct Food {
     source: String,
     tags: Vec<String>,
     allergens: Vec<String>,
-    servings: Entry<String, u32>,
+    servings: HashMap<String, u32>,
     glycemic_index: u32,
     energy: u32,
     carbohydrate: f32,
