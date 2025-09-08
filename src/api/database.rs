@@ -232,7 +232,7 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
         if let Ok(mut foods) = serde_json::from_reader::<_, Vec<Food>>(file) {
             all_foods.append(&mut foods);
         } else {
-            warn!("{}/{} dosyası JSON formatında okunamadı!", dir, file_name);
+            warn!("{}/{} dosyası JSON yemek formatında okunamadı!", dir, file_name);
         };
     }
 
