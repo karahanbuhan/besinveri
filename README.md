@@ -1,5 +1,5 @@
 # BesinVeri
-Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan açık ve ücretsiz bir API. 
+Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan açık ve ücretsiz bir REST API. 
 
 #### Şu anda geliştirme aşamasındadır ve kullanıma hazır değildir. API aktif olduğunda burası güncellenecektir.
 
