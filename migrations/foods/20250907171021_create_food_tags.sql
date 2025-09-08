@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS food_tags (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     food_id     INTEGER NOT NULL,
-    tag_id      INTEGER NOT NULL
+    tag_id      INTEGER NOT NULL,
+    PRIMARY KEY (food_id, tag_id)
 )
