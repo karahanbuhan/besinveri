@@ -28,45 +28,47 @@ pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
         // Eğer yoklar ise bu yemekleri veritabanına eklemeliyiz
         for food in foods {
             let food_name = food.description.to_owned();
-            let result = insert_food(&pool, food).await;
 
-            let Ok(food) = result else {
-                warn!(
-                    "{} yemeğini JSON dosyasından veritabanına aktarırken bir sorun oluştu: {}",
-                    food_name,
-                    result.err().unwrap() //TODO: Unwrap yerine let clause kullansak daha iyi olacak
-                );
-                continue;
-            };
-
-            // ID'yi insert'ten sonra zaman girdiğimiz için burası none olmamalı, yine de Option olduğu için kontrol edelim
-            let Some(food_id) = food.id else {
-                warn!(
-                    "{} yemeğini veritabanına aktarırken kritik bir sorun oluştu!",
-                    food_name
-                );
-                continue;
-            };
-
-            info!(
-                "{} başarıyla {} ID'si ile veritabanına eklendi.",
-                food_name, food_id
-            );
+            match insert_food(&pool, food).await {
+                Ok(updated_food) => {
+                    if let Some(food_id) = updated_food.id {
+                        info!(
+                            "{} başarıyla {} ID'si ile JSON dosyasından, veritabanına eklendi.",
+                            food_name, food_id
+                        );
+                    } else {
+                        // Bu hatanın hiçbir zaman oluşmaması gerek, yine de önlemimizi alalım
+                        warn!(
+                            "{} yemeği veritabanına eklendi ama ID'si alınamadı, kritik hata!",
+                            food_name
+                        );
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "{} yemeğini JSON dosyasından veritabanına aktarırken bir sorun oluştu: {}",
+                        food_name, e
+                    );
+                }
+            }
         }
     }
 
     Ok(pool)
 }
 
+async fn food_exists_by_description(pool: &SqlitePool, description: &str) -> Result<bool, Error> {
+    Ok(sqlx::query_scalar::<_, i32>("SELECT id FROM foods WHERE description = ?")
+        .bind(description)
+        .fetch_optional(pool)
+        .await?.is_some())
+}
+
 async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
     // Yemek halihazırda mevcutsa devam etmeye gerek yok, güncelleme için başka bir method kullanılacak
-    let exists = sqlx::query_scalar::<_, i32>("SELECT id FROM foods WHERE description = ?")
-        .bind(&food.description)
-        .fetch_optional(pool)
-        .await?;
-    if exists.is_some() {
+    if food_exists_by_description(pool, &food.description).await? {
         return Err(anyhow!(
-            "{} isimli yemek zaten veritabanında mevcut, ekleme işlemi atlandı",
+            "{} isimli yemek zaten veritabanında mevcut, ekleme işlemi atlanıyor.",
             food.description
         ));
     }
@@ -236,7 +238,10 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
         if let Ok(mut foods) = serde_json::from_reader::<_, Vec<Food>>(file) {
             all_foods.append(&mut foods);
         } else {
-            warn!("{}/{} dosyası JSON yemek formatında okunamadı!", dir, file_name);
+            warn!(
+                "{}/{} dosyası JSON yemek formatında okunamadı!",
+                dir, file_name
+            );
         };
     }
 
