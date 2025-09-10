@@ -58,10 +58,13 @@ pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
 }
 
 async fn food_exists_by_description(pool: &SqlitePool, description: &str) -> Result<bool, Error> {
-    Ok(sqlx::query_scalar::<_, i32>("SELECT id FROM foods WHERE description = ?")
-        .bind(description)
-        .fetch_optional(pool)
-        .await?.is_some())
+    Ok(
+        sqlx::query_scalar::<_, i32>("SELECT id FROM foods WHERE description = ?")
+            .bind(description)
+            .fetch_optional(pool)
+            .await?
+            .is_some(),
+    )
 }
 
 async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
@@ -246,4 +249,136 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
     }
 
     Ok(all_foods)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*; // Üst scope'daki fonksiyonları kullan
+
+    #[tokio::test]
+    async fn test_connect_and_migrate() -> Result<(), Error> {
+        // In-memory veritabanı ile test
+        let _pool = SqlitePool::connect("sqlite::memory:").await?;
+        let _db_pool = connect().await?; // Gerçek dosya tablosu ile test için yorum satırını kaldır
+        info!("Veritabanı bağlantısı ve migration testi geçti.");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_food_exists_by_description() -> Result<(), Error> {
+        let pool = SqlitePool::connect("sqlite::memory:").await?;
+        sqlx::migrate!("./migrations/foods").run(&pool).await?;
+
+        let food = Food {
+            description: "Test Yemek".to_string(),
+            image_url: "/test.jpg".to_string(),
+            source: "test_source".to_string(),
+            tags: vec!["test".to_string()],
+            allergens: vec![],
+            servings: std::collections::HashMap::new(),
+            glycemic_index: 50.0,
+            energy: 100.0,
+            carbohydrate: 20.0,
+            protein: 5.0,
+            fat: 2.0,
+            saturated_fat: 1.0,
+            trans_fat: 0.0,
+            sugar: 10.0,
+            fiber: 3.0,
+            cholesterol: 0.0,
+            sodium: 50.0,
+            potassium: 200.0,
+            iron: 1.0,
+            magnesium: 30.0,
+            calcium: 10.0,
+            zinc: 0.5,
+            vitamin_a: 0.1,
+            vitamin_b6: 0.2,
+            vitamin_b12: 0.0,
+            vitamin_c: 5.0,
+            vitamin_d: 0.0,
+            vitamin_e: 0.1,
+            vitamin_k: 0.05,
+            verified: None,
+            id: None,
+        };
+
+        insert_food(&pool, food).await?;
+        let exists = food_exists_by_description(&pool, "Test Yemek").await?;
+        assert!(exists);
+
+        let not_exists = food_exists_by_description(&pool, "Nonexistent").await?;
+        assert!(!not_exists);
+
+        info!("food_exists_by_description testi geçti.");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_insert_food_and_load_json() -> Result<(), Error> {
+        // In-memory veritabanı
+        let pool = SqlitePool::connect("sqlite::memory:").await?;
+        sqlx::migrate!("./migrations/foods").run(&pool).await?;
+
+        // Test için geçici dizin oluştur
+        let temp_dir = "./db/test_temp";
+        fs::create_dir_all(temp_dir).unwrap();
+
+        // Test JSON dosyası oluştur
+        let test_json = r#"
+            [
+                {
+                    "description": "JSON Test Yemek",
+                    "image_url": "/json_test.jpg",
+                    "source": "json_source",
+                    "tags": ["json_tag"],
+                    "allergens": [],
+                    "servings": {"Porsiyon": 100},
+                    "glycemic_index": 60.0,
+                    "energy": 120.0,
+                    "carbohydrate": 25.0,
+                    "protein": 6.0,
+                    "fat": 3.0,
+                    "saturated_fat": 1.5,
+                    "trans_fat": 0.0,
+                    "sugar": 12.0,
+                    "fiber": 4.0,
+                    "cholesterol": 0.0,
+                    "sodium": 60.0,
+                    "potassium": 220.0,
+                    "iron": 1.2,
+                    "magnesium": 35.0,
+                    "calcium": 12.0,
+                    "zinc": 0.6,
+                    "vitamin_a": 0.15,
+                    "vitamin_b6": 0.25,
+                    "vitamin_b12": 0.0,
+                    "vitamin_c": 6.0,
+                    "vitamin_d": 0.0,
+                    "vitamin_e": 0.12,
+                    "vitamin_k": 0.06
+                }
+            ]
+        "#;
+        fs::write(format!("{}/test.json", temp_dir), test_json).unwrap();
+
+        // Sadece test dizininden yükle
+        let foods = load_foods_from_jsons(temp_dir).unwrap();
+        assert_eq!(foods.len(), 1, "Sadece bir yemek yüklenmeli"); // Diğer dosyaları eklemez
+        let food = foods[0].clone();
+
+        // Yemeği ekle
+        let result = insert_food(&pool, food).await;
+        assert!(result.is_ok(), "Yemek eklenemedi");
+        let food_id = result.unwrap().id.unwrap();
+        assert!(food_id > 0, "Geçerli bir ID olmalı");
+
+        info!("insert_food ve load_foods_from_jsons testi geçti.");
+
+        // Testten sonra dosyayı ve dizini sil
+        fs::remove_file(format!("{}/test.json", temp_dir)).unwrap();
+        fs::remove_dir(temp_dir).unwrap();
+
+        Ok(())
+    }
 }
