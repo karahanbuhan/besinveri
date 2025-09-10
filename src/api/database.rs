@@ -23,6 +23,7 @@ pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
 
     // JSON dosyalarını bulup hepsini veritabanına eğer mevcut değillerse ekliyoruz. Bu sayede toplu şekilde veritabanına kolayca ekleme yapabiliriz
     // Ayrıca veritabanı dosyası .gitignore'da olacağı ve üzerine JSON harici eklemeler yapılacağı için; varsayılan JSON dosyalarının depoda olması yığın eklemeleri kolaylaştıracaktır
+    // *DİKKAT* JSON okuma methodumuz async değil, bu kod sadece bağlantıda yani ilk açılışta çalıştırıldığı için main thread'i bloklamak sorun olmayacaktır
     if let Ok(foods) = load_foods_from_jsons("./db/foods") {
         // Eğer yoklar ise bu yemekleri veritabanına eklemeliyiz
         for food in foods {
@@ -33,7 +34,7 @@ pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
                 warn!(
                     "{} yemeğini JSON dosyasından veritabanına aktarırken bir sorun oluştu: {}",
                     food_name,
-                    result.err().unwrap()
+                    result.err().unwrap() //TODO: Unwrap yerine let clause kullansak daha iyi olacak
                 );
                 continue;
             };
@@ -99,18 +100,21 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
 
     // Upsert kullanmıyoruz, yani JSON verileri sadece varsayılan olarak kullanılıyor. Daha sonra manuel veritabanı üzerinden
     // değişiklik yapıldığı takdirde, JSON verilerinin üzerine yazılabilecek.
+
+    // created_at ve updated_at değerlerini SQLite kendisi varsayılan vereceği için buradan müdahale etmiyoruz
     let food_id = sqlx
         ::query_scalar::<_, i32>(
             "INSERT OR IGNORE INTO foods (
-            description, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
+            description, verified, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
             trans_fat, sugar, cholesterol, sodium, potassium, iron, magnesium, calcium, zinc, vitamin_a, vitamin_b6, 
             vitamin_b12, vitamin_c, vitamin_d, vitamin_e, vitamin_k)
 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             
             RETURNING ID"
         )
         .bind(&food.description)
+        .bind(food.verified.unwrap_or(false) as i32)
         .bind(&image_id)
         .bind(&source_id)
         .bind(&food.glycemic_index)

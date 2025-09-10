@@ -1,6 +1,9 @@
 CREATE TABLE IF NOT EXISTS foods (
     id              INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     description     TEXT NOT NULL UNIQUE,
+    verified        INTEGER DEFAULT 0,
+    created_at      INTEGER DEFAULT (strftime('%s', 'now')),
+    updated_at      INTEGER DEFAULT 0,
     image_id        INTEGER NOT NULL,
     source_id       INTEGER NOT NULL,
     glycemic_index  REAL NOT NULL,
