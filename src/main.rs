@@ -1,4 +1,6 @@
-use axum::{Router, routing};
+use axum::{Router, routing::get};
+
+use crate::api::status::get_status_handler;
 
 mod api;
 mod core;
@@ -12,7 +14,8 @@ async fn main() {
 
     let api_db = api::database::connect().await;
 
-    let router = Router::new().route("/", routing::get(|| async { "Hello, World" }));
+    let router = Router::new().route("/api/status", get(get_status_handler));
+
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8099").await.unwrap();
 
     axum::serve(listener, router).await.unwrap();
