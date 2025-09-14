@@ -3,7 +3,7 @@ use std::fs;
 use crate::core::food::Food;
 use anyhow::{Context, Error, anyhow};
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Sqlite, SqlitePool, Row};
+use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use tracing::{info, warn};
 
 pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
@@ -252,13 +252,18 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
     Ok(all_foods)
 }
 
-async fn get_all_foods_descriptors(pool: &SqlitePool) -> Result<Vec<(u32, String)>, Error> {
+pub(crate) async fn get_all_foods_descriptors(
+    pool: &SqlitePool,
+) -> Result<Vec<(u32, String)>, Error> {
     let mut descriptors: Vec<(u32, String)> = Vec::new();
-    for row in sqlx::query("SELECT id, description FROM foods").fetch_all(pool).await? {
+    for row in sqlx::query("SELECT id, description FROM foods")
+        .fetch_all(pool)
+        .await?
+    {
         let id: i64 = row.try_get("id")?;
-        let description: &str = row.try_get("description")?;
-        descriptors.push((id as u32, description.to_owned()));
-    }  
+        let description: String = crate::core::str::to_kebab_case(row.try_get("description")?);
+        descriptors.push((id as u32, description));
+    }
     Ok(descriptors)
 }
 
@@ -402,8 +407,8 @@ mod tests {
 
         // Test verisi ekle
         let food1 = Food {
-            description: "Elma".to_string(),
-            image_url: "/elma.jpg".to_string(),
+            description: "Fuji Elma".to_string(),
+            image_url: "/fuji-elma.jpg".to_string(),
             source: "test_source".to_string(),
             tags: vec!["meyve".to_string()],
             allergens: vec![],
@@ -477,13 +482,24 @@ mod tests {
 
         // Sonuçları doğrula
         assert_eq!(result.len(), 2, "İki yemek açıklaması bekleniyor");
-        assert_eq!(result[0], (1_u32, "Elma".to_string()), "İlk açıklama eşleşmiyor");
-        assert_eq!(result[1], (2_u32, "Muz".to_string()), "İkinci açıklama eşleşmiyor");
+        assert_eq!(
+            result[0],
+            (1_u32, "fuji-elma".to_string()),
+            "İlk açıklama eşleşmiyor"
+        );
+        assert_eq!(
+            result[1],
+            (2_u32, "muz".to_string()),
+            "İkinci açıklama eşleşmiyor"
+        );
 
         // Boş tablo testi
         sqlx::query("DELETE FROM foods").execute(&pool).await?;
         let empty_result = get_all_foods_descriptors(&pool).await?;
-        assert!(empty_result.is_empty(), "Boş tablo için boş sonuç bekleniyor");
+        assert!(
+            empty_result.is_empty(),
+            "Boş tablo için boş sonuç bekleniyor"
+        );
 
         info!("get_all_foods_descriptors testi geçti.");
         Ok(())
@@ -500,7 +516,10 @@ mod tests {
         // Hata beklendiğini doğrula
         assert!(result.is_err(), "Tablo olmadığında hata bekleniyor");
         if let Err(err) = result {
-            assert!(err.to_string().contains("no such table"), "Hata 'no such table' içermeli");
+            assert!(
+                err.to_string().contains("no such table"),
+                "Hata 'no such table' içermeli"
+            );
         }
 
         info!("get_all_foods_descriptors tablo yok testi geçti.");

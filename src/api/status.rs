@@ -1,4 +1,4 @@
-use axum::{Json, http::StatusCode};
+use axum::{Json};
 use chrono::{FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -14,7 +14,7 @@ pub(crate) struct ServerStatus {
 // Cargo bize environment üzerinden sürümü sağlıyor, manuel girmeye gerek yok
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub(crate) async fn get_status_handler() -> Result<Json<ServerStatus>, (StatusCode, &'static str)> {
+pub(crate) async fn get_status_handler() -> Result<Json<ServerStatus>, ()> {
     let timestamp = {
         let utc_time = Utc::now();
         let turkish_offset = FixedOffset::east_opt(3 * 3600).unwrap(); // +3 saat
