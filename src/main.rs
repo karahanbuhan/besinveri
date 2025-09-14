@@ -5,7 +5,7 @@ use axum::{Router, routing::get};
 use sqlx::{Pool, Sqlite};
 use tokio::sync::Mutex;
 
-use crate::api::status::get_status_handler;
+use crate::api::{foods::get_foods_handler, status::get_status_handler};
 
 mod api;
 mod core;
@@ -29,6 +29,7 @@ async fn main() -> Result<(), Error> {
 
     let router = Router::new()
         .route("/api/status", get(get_status_handler))
+        .route("/api/foods", get(get_foods_handler))
         .with_state(shared_state.clone());
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8099").await?;
     axum::serve(listener, router).await?;

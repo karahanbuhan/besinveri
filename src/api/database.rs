@@ -2,7 +2,6 @@ use std::fs;
 
 use crate::core::food::Food;
 use anyhow::{Context, Error, anyhow};
-use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use tracing::{info, warn};
 
@@ -252,19 +251,17 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
     Ok(all_foods)
 }
 
-pub(crate) async fn get_all_foods_descriptors(
-    pool: &SqlitePool,
-) -> Result<Vec<(u32, String)>, Error> {
-    let mut descriptors: Vec<(u32, String)> = Vec::new();
-    for row in sqlx::query("SELECT id, description FROM foods")
+pub(crate) async fn select_all_foods_descriptions(pool: &SqlitePool) -> Result<Vec<String>, Error> {
+    let mut descriptions: Vec<String> = Vec::new();
+
+    for row in sqlx::query("SELECT description FROM foods")
         .fetch_all(pool)
         .await?
     {
-        let id: i64 = row.try_get("id")?;
-        let description: String = crate::core::str::to_kebab_case(row.try_get("description")?);
-        descriptors.push((id as u32, description));
+        descriptions.push(row.try_get("description")?);
     }
-    Ok(descriptors)
+
+    Ok(descriptions)
 }
 
 #[cfg(test)]
@@ -399,7 +396,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_get_all_foods_descriptors() -> Result<(), Error> {
+    async fn test_select_all_foods_descriptions() -> Result<(), Error> {
         // In-memory veritabanı
         let pool = SqlitePool::connect("sqlite::memory:").await?;
         // Migration'ları çalıştır
@@ -478,40 +475,36 @@ mod tests {
         insert_food(&pool, food2).await?;
 
         // Fonksiyonu çağır
-        let result = get_all_foods_descriptors(&pool).await?;
+        let result = select_all_foods_descriptions(&pool).await?;
 
         // Sonuçları doğrula
         assert_eq!(result.len(), 2, "İki yemek açıklaması bekleniyor");
         assert_eq!(
             result[0],
-            (1_u32, "fuji-elma".to_string()),
+            ("Fuji Elma".to_string()),
             "İlk açıklama eşleşmiyor"
         );
-        assert_eq!(
-            result[1],
-            (2_u32, "muz".to_string()),
-            "İkinci açıklama eşleşmiyor"
-        );
+        assert_eq!(result[1], ("Muz".to_string()), "İkinci açıklama eşleşmiyor");
 
         // Boş tablo testi
         sqlx::query("DELETE FROM foods").execute(&pool).await?;
-        let empty_result = get_all_foods_descriptors(&pool).await?;
+        let empty_result = select_all_foods_descriptions(&pool).await?;
         assert!(
             empty_result.is_empty(),
             "Boş tablo için boş sonuç bekleniyor"
         );
 
-        info!("get_all_foods_descriptors testi geçti.");
+        info!("select_all_foods_descriptons testi geçti.");
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_get_all_foods_descriptors_no_table() -> Result<(), Error> {
+    async fn test_select_all_foods_descriptions_no_table() -> Result<(), Error> {
         // In-memory veritabanı
         let pool = SqlitePool::connect("sqlite::memory:").await?;
 
         // Migration'ları çalıştırmadan fonksiyonu çağır (tablo yok)
-        let result = get_all_foods_descriptors(&pool).await;
+        let result = select_all_foods_descriptions(&pool).await;
 
         // Hata beklendiğini doğrula
         assert!(result.is_err(), "Tablo olmadığında hata bekleniyor");
@@ -522,7 +515,7 @@ mod tests {
             );
         }
 
-        info!("get_all_foods_descriptors tablo yok testi geçti.");
+        info!("select_all_foods_descriptions tablo yok testi geçti.");
         Ok(())
     }
 }
