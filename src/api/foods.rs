@@ -5,7 +5,15 @@ use axum::{Json, extract::State, http::StatusCode};
 use anyhow::Result;
 use tracing::error;
 
-use crate::{SharedState, api::database, core::str::to_lower_en_kebab_case};
+use crate::{api::database, core::{food::Food, str::to_lower_en_kebab_case}, SharedState};
+
+
+pub(crate) async fn get_food_handler(State(shared_state): State<SharedState>) -> Result<Json<Food>, (StatusCode, &'static str)> {
+    Ok(Json(Food {
+        ..
+    
+    }))
+}
 
 // HashMap yerine BTreeMap kullanma sebebimiz, yemek isimlerini alfabetik sıralamak istememiz. HashMap kullansaydık her seferinde rastgele sıralama olacaktı
 pub(crate) async fn get_foods_handler(

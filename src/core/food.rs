@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct Food {
     // ID ve Verified değerleri JSON'dan yükleme yapılırken bulunmayabilir, okurken de bu struct'ı kullanacağımız için Option olarak kullanacağız
     pub(crate) id: Option<u32>,
+    pub(crate) slug: String,
     pub(crate) description: String,
     pub(crate) verified: Option<bool>,
     pub(crate) image_url: String,

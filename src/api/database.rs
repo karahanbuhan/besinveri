@@ -1,6 +1,6 @@
 use std::fs;
 
-use crate::core::food::Food;
+use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
 use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use tracing::{info, warn};
@@ -110,14 +110,15 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
     let food_id = sqlx
         ::query_scalar::<_, i32>(
             "INSERT OR IGNORE INTO foods (
-            description, verified, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
+            slug, description, verified, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
             trans_fat, sugar, cholesterol, sodium, potassium, iron, magnesium, calcium, zinc, vitamin_a, vitamin_b6, 
             vitamin_b12, vitamin_c, vitamin_d, vitamin_e, vitamin_k)
 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             
             RETURNING ID"
         )
+        .bind(to_lower_en_kebab_case(&food.description))
         .bind(&food.description)
         .bind(food.verified.unwrap_or(false) as i32)
         .bind(&image_id)
@@ -283,6 +284,7 @@ mod tests {
         sqlx::migrate!("./migrations/foods").run(&pool).await?;
 
         let food = Food {
+            slug: "test-yemek".to_string(),
             description: "Test Yemek".to_string(),
             image_url: "/test.jpg".to_string(),
             source: "test_source".to_string(),
@@ -404,6 +406,7 @@ mod tests {
 
         // Test verisi ekle
         let food1 = Food {
+            slug: "fuji-elma".to_string(),
             description: "Fuji Elma".to_string(),
             image_url: "/fuji-elma.jpg".to_string(),
             source: "test_source".to_string(),
@@ -437,6 +440,7 @@ mod tests {
             id: None,
         };
         let food2 = Food {
+            slug: "muz".to_string(),
             description: "Muz".to_string(),
             image_url: "/muz.jpg".to_string(),
             source: "test_source".to_string(),
