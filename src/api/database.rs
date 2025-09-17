@@ -111,10 +111,10 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         ::query_scalar::<_, i64>(
             "INSERT OR IGNORE INTO foods (
             slug, description, verified, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
-            trans_fat, sugar, cholesterol, sodium, potassium, iron, magnesium, calcium, zinc, vitamin_a, vitamin_b6, 
+            trans_fat, sugar, fiber, water, cholesterol, sodium, potassium, iron, magnesium, calcium, zinc, vitamin_a, vitamin_b6, 
             vitamin_b12, vitamin_c, vitamin_d, vitamin_e, vitamin_k)
 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             
             RETURNING ID"
         )
@@ -131,6 +131,8 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         .bind(&food.saturated_fat)
         .bind(&food.trans_fat)
         .bind(&food.sugar)
+        .bind(&food.fiber)
+        .bind(&food.water)
         .bind(&food.cholesterol)
         .bind(&food.sodium)
         .bind(&food.potassium)
@@ -250,7 +252,11 @@ async fn select_serving_description_by_id(
 }
 
 async fn select_tag_description_by_id(pool: &SqlitePool, tag_id: i64) -> Result<String, Error> {
-    select_description_by_id(pool, "tag", tag_id).await
+    select_description_by_id(pool, "tags", tag_id).await
+}
+
+async fn select_image_url_by_id(pool: &SqlitePool, image_id: i64) -> Result<String, Error> {
+    select_column_by_id(pool, "food_images", "image_url", image_id).await
 }
 
 async fn select_source_description_by_id(
@@ -265,12 +271,23 @@ async fn select_description_by_id(
     table: &str,
     id: i64,
 ) -> Result<String, Error> {
+    select_column_by_id(pool, table, "description", id).await
+}
+
+async fn select_column_by_id(
+    pool: &SqlitePool,
+    table: &str,
+    column: &str,
+    id: i64,
+) -> Result<String, Error> {
     Ok(
-        sqlx::query_scalar::<_, String>("SELECT description FROM ? WHERE (id = ?)")
-            .bind(table)
-            .bind(id)
-            .fetch_one(pool)
-            .await?,
+        sqlx::query_scalar::<_, String>(&format!(
+            "SELECT {} FROM {} WHERE (id = ?)",
+            column, table
+        ))
+        .bind(id)
+        .fetch_one(pool)
+        .await?,
     )
 }
 
@@ -318,7 +335,7 @@ async fn select_food_servings_by_food_id(
     let mut servings: HashMap<String, f64> = HashMap::new();
 
     for row in
-        sqlx::query("SELECT serving_description_id, weight FROM food_allergens WHERE (food_id = ?)")
+        sqlx::query("SELECT serving_description_id, weight FROM food_servings WHERE (food_id = ?)")
             .bind(food_id)
             .fetch_all(pool)
             .await?
@@ -337,16 +354,17 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result
         .fetch_one(pool)
         .await?;
 
-    // ID alerjenler için vs. kullandığımız için için değişken oluşuruyoruz
     let id: i64 = row.try_get("id")?;
+    let image_id: i64 = row.try_get("image_id")?;
+    let source_id: i64 = row.try_get("source_id")?;
 
     Ok(Food {
         id: Some(id),
         slug: row.try_get("slug")?,
         description: row.try_get("description")?,
         verified: Some(row.try_get::<i64, _>("verified")? != 0),
-        image_url: row.try_get("image_url")?,
-        source: row.try_get("source")?,
+        image_url: select_image_url_by_id(pool, image_id).await?,
+        source: select_source_description_by_id(pool, source_id).await?,
         tags: select_food_tags_by_food_id(pool, id).await?,
         allergens: select_food_allergens_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
         servings: select_food_servings_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
@@ -359,6 +377,7 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result
         trans_fat: row.try_get("trans_fat")?,
         sugar: row.try_get("sugar")?,
         fiber: row.try_get("fiber")?,
+        water: row.try_get("water")?,
         cholesterol: row.try_get("cholesterol")?,
         sodium: row.try_get("sodium")?,
         potassium: row.try_get("potassium")?,
@@ -425,7 +444,7 @@ mod tests {
         sqlx::migrate!("./migrations/foods").run(&pool).await?;
 
         let food = Food {
-            slug: "test-yemek".to_string(),
+            slug: Some("test-yemek".to_string()),
             description: "Test Yemek".to_string(),
             image_url: "/test.jpg".to_string(),
             source: "test_source".to_string(),
@@ -441,6 +460,7 @@ mod tests {
             trans_fat: 0.0,
             sugar: 10.0,
             fiber: 3.0,
+            water: 55.0,
             cholesterol: 0.0,
             sodium: 50.0,
             potassium: 200.0,
@@ -547,7 +567,7 @@ mod tests {
 
         // Test verisi ekle
         let food1 = Food {
-            slug: "fuji-elma".to_string(),
+            slug: Some("fuji-elma".to_string()),
             description: "Fuji Elma".to_string(),
             image_url: "/fuji-elma.jpg".to_string(),
             source: "test_source".to_string(),
@@ -563,6 +583,7 @@ mod tests {
             trans_fat: 0.0,
             sugar: 8.0,
             fiber: 2.0,
+            water: 55.0,
             cholesterol: 0.0,
             sodium: 1.0,
             potassium: 150.0,
@@ -582,7 +603,7 @@ mod tests {
         };
 
         let food2 = Food {
-            slug: "muz".to_string(),
+            slug: Some("muz".to_string()),
             description: "Muz".to_string(),
             image_url: "/muz.jpg".to_string(),
             source: "test_source".to_string(),
@@ -598,6 +619,7 @@ mod tests {
             trans_fat: 0.0,
             sugar: 15.0,
             fiber: 3.0,
+            water: 55.0,
             cholesterol: 0.0,
             sodium: 1.0,
             potassium: 300.0,
