@@ -5,7 +5,7 @@ use axum::{Router, routing::get};
 use sqlx::{Pool, Sqlite};
 use tokio::sync::Mutex;
 
-use crate::api::{foods::get_foods_handler, status::get_status_handler};
+use crate::{api::{foods::get_foods_handler, status::get_status_handler}, core::config::Config};
 
 mod api;
 mod core;
@@ -13,6 +13,7 @@ mod core;
 #[derive(Clone)]
 struct SharedState {
     api_db: Arc<Mutex<Pool<Sqlite>>>,
+    config: Arc<Mutex<Config>>
 }
 
 #[tokio::main]
@@ -25,6 +26,7 @@ async fn main() -> Result<(), Error> {
     // Veritabanı ve benzerlerini, tüm handlerlar ile kullanabilmek için bir shared_state oluşturuyoruz
     let shared_state = SharedState {
         api_db: Arc::new(Mutex::new(api::database::connect().await?)),
+        config: Arc::new(Mutex::new(core::config::load_config_with_defaults()?))
     };
 
     let router = Router::new()

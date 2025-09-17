@@ -7,8 +7,6 @@ use tracing::error;
 
 use crate::{SharedState, api::database, core::str::to_lower_en_kebab_case};
 
-const API_BASE_URL: &str = "https://api.besinveri.com";
-
 // HashMap yerine BTreeMap kullanma sebebimiz, yemek isimlerini alfabetik sıralamak istememiz. HashMap kullansaydık her seferinde rastgele sıralama olacaktı
 pub(crate) async fn get_foods_handler(
     State(shared_state): State<SharedState>,
@@ -23,11 +21,15 @@ pub(crate) async fn get_foods_handler(
             (StatusCode::INTERNAL_SERVER_ERROR, "Veritabanı hatası")
         })?;
 
+    let api_base_url = &shared_state.config.lock().await.api.base_url;
+
     Ok(Json(
         descriptions
             .into_iter()
-            .map(|desc| to_lower_en_kebab_case(&desc)) // Önce Fuji Elma -> fuji-elma şekline çeviriyoruz, tr karakter varsa en yapıyoruz
-            .map(|desc| (desc.clone(), API_BASE_URL.to_owned() + "/foods/" + &desc))
+             // Önce Fuji Elma -> fuji-elma şekline çeviriyoruz, tr karakter varsa en yapıyoruz
+            .map(|desc| to_lower_en_kebab_case(&desc))
+            // Daha sonra fuji-elma: https://API_BASE.URL/foods/food1\n.../food2 şeklinde gösteriyoruz 
+            .map(|desc| (desc.clone(), api_base_url.clone() + "/foods/" + &desc))
             .collect(),
     ))
 }
