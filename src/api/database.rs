@@ -519,6 +519,7 @@ mod tests {
                     "trans_fat": 0.0,
                     "sugar": 12.0,
                     "fiber": 4.0,
+                    "water": 55.0,
                     "cholesterol": 0.0,
                     "sodium": 60.0,
                     "potassium": 220.0,
