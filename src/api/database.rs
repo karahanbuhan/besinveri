@@ -252,17 +252,17 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
     Ok(all_foods)
 }
 
-pub(crate) async fn select_all_foods_descriptions(pool: &SqlitePool) -> Result<Vec<String>, Error> {
-    let mut descriptions: Vec<String> = Vec::new();
+pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<String>, Error> {
+    let mut slugs: Vec<String> = Vec::new();
 
-    for row in sqlx::query("SELECT description FROM foods")
+    for row in sqlx::query("SELECT slug FROM foods")
         .fetch_all(pool)
         .await?
     {
-        descriptions.push(row.try_get("description")?);
+        slugs.push(row.try_get("slug")?);
     }
 
-    Ok(descriptions)
+    Ok(slugs)
 }
 
 #[cfg(test)]
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_select_all_foods_descriptions() -> Result<(), Error> {
+    async fn test_select_all_foods_slugs() -> Result<(), Error> {
         // In-memory veritabanı
         let pool = SqlitePool::connect("sqlite::memory:").await?;
         // Migration'ları çalıştır
@@ -439,6 +439,7 @@ mod tests {
             verified: None,
             id: None,
         };
+
         let food2 = Food {
             slug: "muz".to_string(),
             description: "Muz".to_string(),
@@ -479,36 +480,38 @@ mod tests {
         insert_food(&pool, food2).await?;
 
         // Fonksiyonu çağır
-        let result = select_all_foods_descriptions(&pool).await?;
+        let result = select_all_foods_slugs(&pool).await?;
 
-        // Sonuçları doğrula
-        assert_eq!(result.len(), 2, "İki yemek açıklaması bekleniyor");
-        assert_eq!(
-            result[0],
-            ("Fuji Elma".to_string()),
-            "İlk açıklama eşleşmiyor"
+        // Sonuçları doğrula (SLUG kontrolü)
+        assert_eq!(result.len(), 2, "İki yemek slug'ı bekleniyor");
+        assert!(
+            result.contains(&"fuji-elma".to_string()),
+            "İlk slug 'fuji-elma' bulunamadı"
         );
-        assert_eq!(result[1], ("Muz".to_string()), "İkinci açıklama eşleşmiyor");
+        assert!(
+            result.contains(&"muz".to_string()),
+            "İkinci slug 'muz' bulunamadı"
+        );
 
         // Boş tablo testi
         sqlx::query("DELETE FROM foods").execute(&pool).await?;
-        let empty_result = select_all_foods_descriptions(&pool).await?;
+        let empty_result = select_all_foods_slugs(&pool).await?;
         assert!(
             empty_result.is_empty(),
             "Boş tablo için boş sonuç bekleniyor"
         );
 
-        info!("select_all_foods_descriptons testi geçti.");
+        info!("select_all_foods_slugs testi geçti.");
         Ok(())
     }
 
     #[tokio::test]
-    async fn test_select_all_foods_descriptions_no_table() -> Result<(), Error> {
+    async fn test_select_all_foods_slugs_no_table() -> Result<(), Error> {
         // In-memory veritabanı
         let pool = SqlitePool::connect("sqlite::memory:").await?;
 
         // Migration'ları çalıştırmadan fonksiyonu çağır (tablo yok)
-        let result = select_all_foods_descriptions(&pool).await;
+        let result = select_all_foods_slugs(&pool).await;
 
         // Hata beklendiğini doğrula
         assert!(result.is_err(), "Tablo olmadığında hata bekleniyor");
@@ -519,7 +522,7 @@ mod tests {
             );
         }
 
-        info!("select_all_foods_descriptions tablo yok testi geçti.");
+        info!("select_all_foods_slugs tablo yok testi geçti.");
         Ok(())
     }
 }
