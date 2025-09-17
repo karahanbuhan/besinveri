@@ -1,4 +1,4 @@
-use std::fs;
+use std::{collections::HashMap, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
@@ -59,7 +59,7 @@ pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
 
 async fn food_exists_by_description(pool: &SqlitePool, description: &str) -> Result<bool, Error> {
     Ok(
-        sqlx::query_scalar::<_, i32>("SELECT id FROM foods WHERE description = ?")
+        sqlx::query_scalar::<_, i64>("SELECT id FROM foods WHERE description = ?")
             .bind(description)
             .fetch_optional(pool)
             .await?
@@ -84,7 +84,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         .execute(&mut *tx)
         .await?;
     let source_id =
-        sqlx::query_scalar::<_, i32>("SELECT id FROM food_sources WHERE description = ? LIMIT 1")
+        sqlx::query_scalar::<_, i64>("SELECT id FROM food_sources WHERE description = ? LIMIT 1")
             .bind(&food.source)
             .fetch_one(&mut *tx)
             .await?;
@@ -94,7 +94,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         .execute(&mut *tx)
         .await?;
     let image_id =
-        sqlx::query_scalar::<_, i32>("SELECT id FROM food_images WHERE image_url = ? LIMIT 1")
+        sqlx::query_scalar::<_, i64>("SELECT id FROM food_images WHERE image_url = ? LIMIT 1")
             .bind(&food.image_url)
             .fetch_one(&mut *tx)
             .await?;
@@ -108,7 +108,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
 
     // created_at ve updated_at değerlerini SQLite kendisi varsayılan vereceği için buradan müdahale etmiyoruz
     let food_id = sqlx
-        ::query_scalar::<_, i32>(
+        ::query_scalar::<_, i64>(
             "INSERT OR IGNORE INTO foods (
             slug, description, verified, image_id, source_id, glycemic_index, energy, carbohydrate, protein, fat, saturated_fat, 
             trans_fat, sugar, cholesterol, sodium, potassium, iron, magnesium, calcium, zinc, vitamin_a, vitamin_b6, 
@@ -120,7 +120,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         )
         .bind(to_lower_en_kebab_case(&food.description))
         .bind(&food.description)
-        .bind(food.verified.unwrap_or(false) as i32)
+        .bind(food.verified.unwrap_or(false) as i64)
         .bind(&image_id)
         .bind(&source_id)
         .bind(&food.glycemic_index)
@@ -155,7 +155,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
             .bind(&tag)
             .execute(&mut *tx)
             .await?;
-        let tag_id = sqlx::query_scalar::<_, i32>(
+        let tag_id = sqlx::query_scalar::<_, i64>(
             "SELECT id FROM tags WHERE description = LOWER(?) LIMIT 1",
         )
         .bind(&tag)
@@ -176,7 +176,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
             .bind(&allergen)
             .execute(&mut *tx)
             .await?;
-        let allergen_id = sqlx::query_scalar::<_, i32>(
+        let allergen_id = sqlx::query_scalar::<_, i64>(
             "SELECT id FROM allergens WHERE description = LOWER(?) LIMIT 1",
         )
         .bind(&allergen)
@@ -197,7 +197,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
             .bind(&serving.0)
             .execute(&mut *tx)
             .await?;
-        let serving_description_id = sqlx::query_scalar::<_, i32>(
+        let serving_description_id = sqlx::query_scalar::<_, i64>(
             "SELECT id FROM serving_descriptions WHERE description = ? LIMIT 1",
         )
         .bind(&serving.0)
@@ -217,8 +217,162 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
 
     // Yeni yemek yapısını döndürüyoruz, tabii ki veritabanı ID'si ile
     Ok(Food {
-        id: Some(food_id as u32),
+        id: Some(food_id),
         ..food
+    })
+}
+
+pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<String>, Error> {
+    let mut slugs: Vec<String> = Vec::new();
+
+    for row in sqlx::query("SELECT slug FROM foods")
+        .fetch_all(pool)
+        .await?
+    {
+        slugs.push(row.try_get("slug")?);
+    }
+
+    Ok(slugs)
+}
+
+async fn select_allergen_description_by_id(
+    pool: &SqlitePool,
+    allergen_id: i64,
+) -> Result<String, Error> {
+    select_description_by_id(pool, "allergens", allergen_id).await
+}
+
+async fn select_serving_description_by_id(
+    pool: &SqlitePool,
+    serving_description_id: i64,
+) -> Result<String, Error> {
+    select_description_by_id(pool, "serving_descriptions", serving_description_id).await
+}
+
+async fn select_tag_description_by_id(pool: &SqlitePool, tag_id: i64) -> Result<String, Error> {
+    select_description_by_id(pool, "tag", tag_id).await
+}
+
+async fn select_source_description_by_id(
+    pool: &SqlitePool,
+    source_id: i64,
+) -> Result<String, Error> {
+    select_description_by_id(pool, "food_sources", source_id).await
+}
+
+async fn select_description_by_id(
+    pool: &SqlitePool,
+    table: &str,
+    id: i64,
+) -> Result<String, Error> {
+    Ok(
+        sqlx::query_scalar::<_, String>("SELECT description FROM ? WHERE (id = ?)")
+            .bind(table)
+            .bind(id)
+            .fetch_one(pool)
+            .await?,
+    )
+}
+
+async fn select_food_allergens_by_food_id(
+    pool: &SqlitePool,
+    food_id: i64,
+) -> Result<Vec<String>, Error> {
+    let mut allergens: Vec<String> = Vec::new();
+
+    for row in sqlx::query("SELECT allergen_id FROM food_allergens WHERE (food_id = ?)")
+        .bind(food_id)
+        .fetch_all(pool)
+        .await?
+    {
+        let description =
+            select_allergen_description_by_id(pool, row.try_get("allergen_id")?).await?;
+        allergens.push(description);
+    }
+
+    Ok(allergens)
+}
+
+async fn select_food_tags_by_food_id(
+    pool: &SqlitePool,
+    food_id: i64,
+) -> Result<Vec<String>, Error> {
+    let mut tags: Vec<String> = Vec::new();
+
+    for row in sqlx::query("SELECT tag_id FROM food_tags WHERE (food_id = ?)")
+        .bind(food_id)
+        .fetch_all(pool)
+        .await?
+    {
+        let description = select_tag_description_by_id(pool, row.try_get("tag_id")?).await?;
+        tags.push(description);
+    }
+
+    Ok(tags)
+}
+
+async fn select_food_servings_by_food_id(
+    pool: &SqlitePool,
+    food_id: i64,
+) -> Result<HashMap<String, f64>, Error> {
+    let mut servings: HashMap<String, f64> = HashMap::new();
+
+    for row in
+        sqlx::query("SELECT serving_description_id, weight FROM food_allergens WHERE (food_id = ?)")
+            .bind(food_id)
+            .fetch_all(pool)
+            .await?
+    {
+        let description =
+            select_serving_description_by_id(pool, row.try_get("serving_description_id")?).await?;
+        servings.insert(description, row.try_get("weight")?);
+    }
+
+    Ok(servings)
+}
+
+pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result<Food, Error> {
+    let row = sqlx::query("SELECT * FROM foods WHERE (slug = ?)")
+        .bind(slug)
+        .fetch_one(pool)
+        .await?;
+
+    // ID alerjenler için vs. kullandığımız için için değişken oluşuruyoruz
+    let id: i64 = row.try_get("id")?;
+
+    Ok(Food {
+        id: Some(id),
+        slug: row.try_get("slug")?,
+        description: row.try_get("description")?,
+        verified: Some(row.try_get::<i64, _>("verified")? != 0),
+        image_url: row.try_get("image_url")?,
+        source: row.try_get("source")?,
+        tags: select_food_tags_by_food_id(pool, id).await?,
+        allergens: select_food_allergens_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
+        servings: select_food_servings_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
+        glycemic_index: row.try_get("glycemic_index")?,
+        energy: row.try_get("energy")?,
+        carbohydrate: row.try_get("carbohydrate")?,
+        protein: row.try_get("protein")?,
+        fat: row.try_get("fat")?,
+        saturated_fat: row.try_get("saturated_fat")?,
+        trans_fat: row.try_get("trans_fat")?,
+        sugar: row.try_get("sugar")?,
+        fiber: row.try_get("fiber")?,
+        cholesterol: row.try_get("cholesterol")?,
+        sodium: row.try_get("sodium")?,
+        potassium: row.try_get("potassium")?,
+        iron: row.try_get("iron")?,
+        magnesium: row.try_get("magnesium")?,
+        calcium: row.try_get("calcium")?,
+        zinc: row.try_get("zinc")?,
+        vitamin_a: row.try_get("vitamin_a")?,
+        vitamin_b6: row.try_get("vitamin_b6")?,
+        vitamin_b12: row.try_get("vitamin_b12")?,
+        vitamin_c: row.try_get("vitamin_c")?,
+        vitamin_d: row.try_get("vitamin_d")?,
+        vitamin_e: row.try_get("vitamin_e")?,
+        vitamin_k: row.try_get("vitamin_k")?,
     })
 }
 
@@ -250,19 +404,6 @@ fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
     }
 
     Ok(all_foods)
-}
-
-pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<String>, Error> {
-    let mut slugs: Vec<String> = Vec::new();
-
-    for row in sqlx::query("SELECT slug FROM foods")
-        .fetch_all(pool)
-        .await?
-    {
-        slugs.push(row.try_get("slug")?);
-    }
-
-    Ok(slugs)
 }
 
 #[cfg(test)]
