@@ -120,7 +120,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
         )
         .bind(to_lower_en_kebab_case(&food.description))
         .bind(&food.description)
-        .bind(food.verified.unwrap_or(false) as i64)
+        .bind(food.verified.unwrap_or(true) as i64)
         .bind(&image_id)
         .bind(&source_id)
         .bind(&food.glycemic_index)
@@ -482,7 +482,7 @@ pub(crate) async fn search_food_by_description_wild(
     // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
     select_foods_where(
         pool,
-        "description LIKE ? LIMIT ?",
+        "description LIKE ?",
         &format!("%{}%", description),
         limit,
     )
