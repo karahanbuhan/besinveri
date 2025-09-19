@@ -348,9 +348,13 @@ async fn select_food_servings_by_food_id(
     Ok(servings)
 }
 
-pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result<Food, Error> {
-    let row = sqlx::query("SELECT * FROM foods WHERE (slug = ?)")
-        .bind(slug)
+async fn select_food_where(
+    pool: &SqlitePool,
+    condition: &str,
+    binding: &str,
+) -> Result<Food, Error> {
+    let row = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
+        .bind(binding)
         .fetch_one(pool)
         .await?;
 
@@ -393,6 +397,18 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result
         vitamin_e: row.try_get("vitamin_e")?,
         vitamin_k: row.try_get("vitamin_k")?,
     })
+}
+
+pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result<Food, Error> {
+    select_food_where(pool, "slug = ?", slug).await
+}
+
+pub(crate) async fn search_food_by_description_wild(
+    pool: &SqlitePool,
+    description: &str,
+) -> Result<Food, Error> {
+    // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
+    select_food_where(pool, "description LIKE ?", &format!("%{}%", description)).await
 }
 
 fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
