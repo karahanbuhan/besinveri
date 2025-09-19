@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
-use sqlx::{Pool, Row, Sqlite, SqlitePool};
+use sqlx::{Pool, Row, Sqlite, SqlitePool, sqlite::SqliteRow};
 use tracing::{info, warn};
 
 pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
@@ -348,11 +348,7 @@ async fn select_food_servings_by_food_id(
     Ok(servings)
 }
 
-async fn select_food_where(
-    pool: &SqlitePool,
-    condition: &str,
-    binding: &str,
-) -> Result<Food, Error> {
+async fn select_food(pool: &SqlitePool, condition: &str, binding: &str) -> Result<Food, Error> {
     let row = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
         .bind(binding)
         .fetch_one(pool)
@@ -399,6 +395,81 @@ async fn select_food_where(
     })
 }
 
+async fn select_food_where(
+    pool: &SqlitePool,
+    condition: &str,
+    binding: &str,
+) -> Result<Food, Error> {
+    let row = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
+        .bind(binding)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(food_from_row(pool, row).await?)
+}
+
+async fn select_foods_where(
+    pool: &SqlitePool,
+    condition: &str,
+    binding: &str,
+    limit: u64,
+) -> Result<Vec<Food>, Error> {
+    let rows = sqlx::query(&format!(
+        "SELECT * FROM foods WHERE {} LIMIT {}",
+        condition, limit
+    ))
+    .bind(binding)
+    .fetch_all(pool)
+    .await?;
+
+    let mut foods: Vec<Food> = Vec::new();
+    for row in rows {
+        foods.push(food_from_row(pool, row).await?)
+    }
+    Ok(foods)
+}
+
+async fn food_from_row(pool: &SqlitePool, row: SqliteRow) -> Result<Food, Error> {
+    let id: i64 = row.try_get("id")?;
+    let image_id: i64 = row.try_get("image_id")?;
+    let source_id: i64 = row.try_get("source_id")?;
+    Ok(Food {
+        id: Some(id),
+        slug: row.try_get("slug")?,
+        description: row.try_get("description")?,
+        verified: Some(row.try_get::<i64, _>("verified")? != 0),
+        image_url: select_image_url_by_id(pool, image_id).await?,
+        source: select_source_description_by_id(pool, source_id).await?,
+        tags: select_food_tags_by_food_id(pool, id).await?,
+        allergens: select_food_allergens_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
+        servings: select_food_servings_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
+        glycemic_index: row.try_get("glycemic_index")?,
+        energy: row.try_get("energy")?,
+        carbohydrate: row.try_get("carbohydrate")?,
+        protein: row.try_get("protein")?,
+        fat: row.try_get("fat")?,
+        saturated_fat: row.try_get("saturated_fat")?,
+        trans_fat: row.try_get("trans_fat")?,
+        sugar: row.try_get("sugar")?,
+        fiber: row.try_get("fiber")?,
+        water: row.try_get("water")?,
+        cholesterol: row.try_get("cholesterol")?,
+        sodium: row.try_get("sodium")?,
+        potassium: row.try_get("potassium")?,
+        iron: row.try_get("iron")?,
+        magnesium: row.try_get("magnesium")?,
+        calcium: row.try_get("calcium")?,
+        zinc: row.try_get("zinc")?,
+        vitamin_a: row.try_get("vitamin_a")?,
+        vitamin_b6: row.try_get("vitamin_b6")?,
+        vitamin_b12: row.try_get("vitamin_b12")?,
+        vitamin_c: row.try_get("vitamin_c")?,
+        vitamin_d: row.try_get("vitamin_d")?,
+        vitamin_e: row.try_get("vitamin_e")?,
+        vitamin_k: row.try_get("vitamin_k")?,
+    })
+}
+
 pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result<Food, Error> {
     select_food_where(pool, "slug = ?", slug).await
 }
@@ -406,9 +477,16 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result
 pub(crate) async fn search_food_by_description_wild(
     pool: &SqlitePool,
     description: &str,
-) -> Result<Food, Error> {
+    limit: u64,
+) -> Result<Vec<Food>, Error> {
     // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
-    select_food_where(pool, "description LIKE ?", &format!("%{}%", description)).await
+    select_foods_where(
+        pool,
+        "description LIKE ? LIMIT ?",
+        &format!("%{}%", description),
+        limit,
+    )
+    .await
 }
 
 fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {

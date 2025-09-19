@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 use crate::{
     api::{
         foods::{get_food_handler, get_foods_handler},
+        search::get_search_food_handler,
         status::get_status_handler,
     },
     core::config::Config,
@@ -39,6 +40,7 @@ async fn main() -> Result<(), Error> {
         .route("/api/status", get(get_status_handler))
         .route("/api/foods", get(get_foods_handler))
         .route("/api/foods/{slug}", get(get_food_handler))
+        .route("/api/search/foods", get(get_search_food_handler))
         .with_state(shared_state.clone());
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8099").await?;
     axum::serve(listener, router).await?;
