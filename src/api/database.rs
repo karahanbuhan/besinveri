@@ -2,7 +2,7 @@ use std::{collections::HashMap, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
-use sqlx::{Pool, Row, Sqlite, SqlitePool, sqlite::SqliteRow};
+use sqlx::{Encode, Pool, Row, Sqlite, SqlitePool, Type, sqlite::SqliteRow};
 use tracing::{info, warn};
 
 pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
@@ -348,59 +348,16 @@ async fn select_food_servings_by_food_id(
     Ok(servings)
 }
 
-async fn select_food(pool: &SqlitePool, condition: &str, binding: &str) -> Result<Food, Error> {
-    let row = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
-        .bind(binding)
-        .fetch_one(pool)
-        .await?;
-
-    let id: i64 = row.try_get("id")?;
-    let image_id: i64 = row.try_get("image_id")?;
-    let source_id: i64 = row.try_get("source_id")?;
-
-    Ok(Food {
-        id: Some(id),
-        slug: row.try_get("slug")?,
-        description: row.try_get("description")?,
-        verified: Some(row.try_get::<i64, _>("verified")? != 0),
-        image_url: select_image_url_by_id(pool, image_id).await?,
-        source: select_source_description_by_id(pool, source_id).await?,
-        tags: select_food_tags_by_food_id(pool, id).await?,
-        allergens: select_food_allergens_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
-        servings: select_food_servings_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
-        glycemic_index: row.try_get("glycemic_index")?,
-        energy: row.try_get("energy")?,
-        carbohydrate: row.try_get("carbohydrate")?,
-        protein: row.try_get("protein")?,
-        fat: row.try_get("fat")?,
-        saturated_fat: row.try_get("saturated_fat")?,
-        trans_fat: row.try_get("trans_fat")?,
-        sugar: row.try_get("sugar")?,
-        fiber: row.try_get("fiber")?,
-        water: row.try_get("water")?,
-        cholesterol: row.try_get("cholesterol")?,
-        sodium: row.try_get("sodium")?,
-        potassium: row.try_get("potassium")?,
-        iron: row.try_get("iron")?,
-        magnesium: row.try_get("magnesium")?,
-        calcium: row.try_get("calcium")?,
-        zinc: row.try_get("zinc")?,
-        vitamin_a: row.try_get("vitamin_a")?,
-        vitamin_b6: row.try_get("vitamin_b6")?,
-        vitamin_b12: row.try_get("vitamin_b12")?,
-        vitamin_c: row.try_get("vitamin_c")?,
-        vitamin_d: row.try_get("vitamin_d")?,
-        vitamin_e: row.try_get("vitamin_e")?,
-        vitamin_k: row.try_get("vitamin_k")?,
-    })
-}
-
-async fn select_food_where(
-    pool: &SqlitePool,
-    condition: &str,
-    binding: &str,
-) -> Result<Food, Error> {
-    let row = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
+async fn select_food_where<'a, T>(
+    pool: &'a SqlitePool,
+    condition: String,
+    binding: T,
+) -> Result<Food, Error>
+where
+    T: for<'b> Encode<'b, Sqlite> + Type<Sqlite> + Send + 'a,
+{
+    let query_str = format!("SELECT * FROM foods WHERE {}", condition);
+    let row = sqlx::query(&query_str)
         .bind(binding)
         .fetch_one(pool)
         .await?;
@@ -470,8 +427,46 @@ async fn food_from_row(pool: &SqlitePool, row: SqliteRow) -> Result<Food, Error>
     })
 }
 
-pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: &str) -> Result<Food, Error> {
-    select_food_where(pool, "slug = ?", slug).await
+pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Result<Food, Error> {
+    select_food_where(pool, "slug = ?".to_owned(), slug).await
+}
+
+pub(crate) async fn search_food_by_tag_wild(
+    pool: &SqlitePool,
+    tag: &str,
+    limit: u64,
+) -> Result<Vec<Food>, Error> {
+    // Tag seçmeliyiz önce description'a like atarak tags'de
+    let tags_row = sqlx::query(&format!(
+        "SELECT * FROM tags WHERE description LIKE ? LIMIT {}",
+        limit
+    ))
+    .bind(format!("%{}%", tag))
+    .fetch_all(pool)
+    .await?;
+    let mut tags: Vec<(i64, String)> = Vec::new();
+    for tag_row in tags_row {
+        tags.push((tag_row.try_get("id")?, tag_row.try_get("description")?));
+    }
+
+    // Sonrasında dönen tag_id'leri food_tags'te aratıp yemekleri döndürmeliyiz
+    let mut foods: Vec<Food> = Vec::new();
+    for (tag_id, _) in tags {
+        let food_ids = sqlx::query(&format!(
+            "SELECT food_id FROM food_tags WHERE tag_id = ? LIMIT {}",
+            limit
+        ))
+        .bind(tag_id)
+        .fetch_all(pool)
+        .await?;
+
+        for food_id in food_ids {
+            let food_id: i64 = food_id.try_get("food_id")?;
+            foods.push(select_food_where(pool, "id = ?".to_owned(), food_id).await?);
+        }
+    }
+
+    Ok(foods)
 }
 
 pub(crate) async fn search_food_by_description_wild(
@@ -482,7 +477,7 @@ pub(crate) async fn search_food_by_description_wild(
     // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
     select_foods_where(
         pool,
-        "description LIKE ?",
+        &format!("description LIKE ?"),
         &format!("%{}%", description),
         limit,
     )
@@ -830,7 +825,7 @@ mod tests {
         insert_food(&pool, test_food).await?;
 
         // select_food_by_slug çağır
-        let result = select_food_by_slug(&pool, "test-food").await?;
+        let result = select_food_by_slug(&pool, "test-food".to_owned()).await?;
 
         // Temel field'ları kontrol et
         assert_eq!(result.slug, Some("test-food".to_owned()));
@@ -848,7 +843,7 @@ mod tests {
         sqlx::migrate!("./migrations/foods").run(&pool).await?;
 
         // Boş tablo
-        let result = select_food_by_slug(&pool, "nonexistent").await;
+        let result = select_food_by_slug(&pool, "nonexistent".to_owned()).await;
         assert!(result.is_err(), "Food bulunamadı hatası bekleniyor");
 
         info!("select_food_by_slug not found testi geçti.");
@@ -938,8 +933,8 @@ mod tests {
         insert_food(&pool, food2).await?;
 
         // Her ikisini de bul
-        let apple = select_food_by_slug(&pool, "apple").await?;
-        let banana = select_food_by_slug(&pool, "banana").await?;
+        let apple = select_food_by_slug(&pool, "apple".to_owned()).await?;
+        let banana = select_food_by_slug(&pool, "banana".to_owned()).await?;
 
         assert_eq!(apple.description, "Apple");
         assert_eq!(apple.energy, 52.0);
@@ -994,7 +989,7 @@ mod tests {
         };
 
         insert_food(&pool, test_food).await?;
-        let food_id = 1; // insert_food'dan dönen ID
+        let _food_id = 1; // insert_food'dan dönen ID
 
         // Helper fonksiyonları test et (basit versiyon)
         // NOT NULL constraint'ları yüzünden relation testleri zor,
@@ -1049,7 +1044,7 @@ mod tests {
         insert_food(&pool, test_food).await?;
 
         // Relations'ı test et (boş dönebilir, ama hata vermemeli)
-        let food = select_food_by_slug(&pool, "relations-test").await?;
+        let food = select_food_by_slug(&pool, "relations-test".to_owned()).await?;
 
         // Temel field'lar
         assert_eq!(food.description, "Relations Test");

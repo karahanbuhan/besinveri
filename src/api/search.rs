@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::Deserialize;
-use tracing::info;
+use tracing::{info};
 
 use crate::{SharedState, api::database, core::food::Food};
 
@@ -19,16 +19,30 @@ pub(crate) async fn get_search_food_handler(
     params: Query<SearchParams>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Vec<Food>>, (StatusCode, &'static str)> {
-    if params.mode.to_lowercase().eq("description") || params.mode.to_lowercase().eq("name") {
-        let foods = database::search_food_by_description_wild(&*shared_state.api_db.lock().await, &params.query, params.limit).await.map_err(|e| {
+    // Moda göre uygun veritabanı sorgusunu atıyoruz
+    let mode = params.mode.to_lowercase();
+
+    let foods = match mode.as_str() {
+        // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
+        "description" | "name" => Ok(sort_foods_by_relevance(&database::search_food_by_description_wild(&*shared_state.api_db.lock().await, &params.query, params.limit).await.map_err(|e| {
             info!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.query, params.mode, params.limit, e);
-            (StatusCode::NOT_FOUND, "Yemek ararken sonuç bulunamadı")
-        })?;
+            (StatusCode::NOT_FOUND, "İsim ile yemek ararken sonuç bulunamadı")
+        })?, &params.query).await),
 
-        return Ok(Json(sort_foods_by_relevance(&foods, &params.query).await));
-    }
+        "tag" => Ok( database::search_food_by_tag_wild(
+            &*shared_state.api_db.lock().await,
+            &params.query,
+            params.limit,
+        )
+        .await.map_err(|e| {
+            info!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.query, params.mode, params.limit, e);
+            (StatusCode::NOT_FOUND, "Etiket ile yemek ararken sonuç bulunamadı")
+        })?),
 
-    Err((StatusCode::BAD_REQUEST, "Geçersiz sorgu!"))
+        _ => Err((StatusCode::BAD_REQUEST, "Geçersiz sorgu!"))
+    }?;
+
+    Ok(Json(foods))
 }
 
 async fn sort_foods_by_relevance<'a>(foods: &'a Vec<Food>, query: &str) -> Vec<Food> {

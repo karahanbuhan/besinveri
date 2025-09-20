@@ -11,7 +11,7 @@ pub(crate) async fn get_food_handler(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, (StatusCode, &'static str)> {
-    let food = database::select_food_by_slug(&*shared_state.api_db.lock().await, &slug).await.map_err(|e| {
+    let food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug).await.map_err(|e| {
         error!("Veritabanı yemek bilgisi sorgularken hata oluştu: {:?}", e);
         (StatusCode::NOT_FOUND, "Bu yemekle ilgili veriye ulaşılamadı")
     })?;
