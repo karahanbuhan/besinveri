@@ -41,7 +41,7 @@ fn get_default_config() -> Config {
 
 fn create_default_config_file(path: &str) -> Result<(), Error> {
     if fs::exists(path)? {
-        // Eğer config mevcutsa bir şey yapmaya gerek yok, sadece debug için log atılacak
+        // Eğer config mevcutsa bir şey yapmaya gerek yok, sadece debug için log atılacak ve işlem atlanacak
         debug!("Config dosyası mevcut, varsayılan config oluşturma işlemi atlanıyor");
         return Ok(());
     }

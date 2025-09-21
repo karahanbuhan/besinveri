@@ -14,7 +14,7 @@ pub(crate) struct ServerStatus {
 // Cargo bize environment üzerinden sürümü sağlıyor, manuel girmeye gerek yok
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub(crate) async fn get_status_handler() -> Result<Json<ServerStatus>, ()> {
+pub(crate) async fn get_status_handler() -> Json<ServerStatus> {
     let timestamp = {
         let utc_time = Utc::now();
         let turkish_offset = FixedOffset::east_opt(3 * 3600).unwrap(); // +3 saat
@@ -29,7 +29,7 @@ pub(crate) async fn get_status_handler() -> Result<Json<ServerStatus>, ()> {
         last_updated: timestamp,
     };
 
-    Ok(Json(status))
+    Json(status)
 }
 
 #[cfg(test)]
@@ -53,7 +53,7 @@ mod tests {
         };
 
         // Handler’ı çağır
-        let response = get_status_handler().await.expect("Handler başarılı olmalı");
+        let response = get_status_handler().await;
 
         // JSON yanıtını al
         let status: ServerStatus = response.0;
