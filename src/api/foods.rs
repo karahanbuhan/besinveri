@@ -16,7 +16,7 @@ pub(crate) async fn get_food_handler(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, (StatusCode, &'static str)> {
-    let food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
+    let mut food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
         .await
         .map_err(|e| {
             error!("Veritabanı yemek bilgisi sorgularken hata oluştu: {:?}", e);
@@ -25,6 +25,8 @@ pub(crate) async fn get_food_handler(
                 "Bu yemekle ilgili veriye ulaşılamadı",
             )
         })?;
+
+    fix_image_url(&State(shared_state), &mut food).await;
 
     Ok(Json(food))
 }
@@ -69,7 +71,7 @@ pub(crate) async fn get_foods_search_handler(
     // Moda göre uygun veritabanı sorgusunu atıyoruz
     let mode = params.mode.to_lowercase();
 
-    let foods = match mode.as_str() {
+    let mut foods = match mode.as_str() {
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
             let db = &*shared_state.api_db.lock().await;
@@ -97,7 +99,26 @@ pub(crate) async fn get_foods_search_handler(
         _ => Err((StatusCode::BAD_REQUEST, "Geçersiz sorgu!")),
     }?;
 
+    fix_image_urls(&State(shared_state), &mut foods).await;
+
     Ok(Json(foods))
+}
+
+async fn fix_image_urls(State(shared_state): &State<SharedState>, foods: &mut Vec<Food>) {
+    // Eğer bir yemeğin resim URL'si / ile başlıyorsa, örneğin /images/muz.webp gibi, https://api.besinveri.com/images/muz.webp formatına getirilmeli
+    let base_url = &shared_state.config.lock().await.api.base_url;
+    foods
+        .iter_mut()
+        .filter(|food| food.image_url.starts_with("/"))
+        .for_each(|food| food.image_url = format!("{}{}", base_url, food.image_url));
+}
+
+async fn fix_image_url(State(shared_state): &State<SharedState>, food: &mut Food) {
+    // Eğer yemeğin resim URL'si / ile başlıyorsa, örneğin /images/muz.webp gibi, https://api.besinveri.com/images/muz.webp formatına getirilmeli
+    if food.image_url.starts_with("/") {
+        let base_url = &shared_state.config.lock().await.api.base_url;
+        food.image_url = format!("{}{}", base_url, food.image_url);
+    }
 }
 
 async fn sort_foods_by_query(foods: &mut Vec<Food>, query: &str) {
@@ -139,14 +160,14 @@ async fn sort_foods_by_query(foods: &mut Vec<Food>, query: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Instant;
     use std::collections::HashMap;
+    use std::time::Instant;
 
     // Test verisi oluşturan helper fonksiyonlar
     fn create_test_foods() -> Vec<Food> {
         let mut servings = HashMap::new();
         servings.insert("portion".to_string(), 100.0);
-        
+
         vec![
             // Prefix match: "kar" ile başlar
             Food {
@@ -299,7 +320,7 @@ mod tests {
         let mut foods = Vec::with_capacity(size);
         let mut servings = HashMap::new();
         servings.insert("portion".to_string(), 100.0);
-        
+
         for i in 0..size {
             let description = match i % 5 {
                 0 => format!("Karpuz {} yaz meyvesi olarak bilinir", i),
@@ -308,7 +329,7 @@ mod tests {
                 3 => format!("Elma {} güneydoğu Asya kökenlidir", i),
                 _ => format!("Meyve {} farklı türde bulunur", i),
             };
-            
+
             foods.push(Food {
                 id: Some(i as i64),
                 slug: Some(format!("food-{}", i)),
@@ -320,32 +341,32 @@ mod tests {
                 allergens: vec![],
                 servings: servings.clone(),
                 glycemic_index: 50.0 + (i as f64 % 50.0), // 50-100 arası rastgele
-                energy: 100.0 + (i as f64 % 400.0), // 100-500 arası
-                carbohydrate: 20.0 + (i as f64 % 60.0), // 20-80 arası
-                protein: 5.0 + (i as f64 % 20.0), // 5-25 arası
-                fat: 3.0 + (i as f64 % 15.0), // 3-18 arası
-                saturated_fat: 1.0 + (i as f64 % 5.0), // 1-6 arası
+                energy: 100.0 + (i as f64 % 400.0),       // 100-500 arası
+                carbohydrate: 20.0 + (i as f64 % 60.0),   // 20-80 arası
+                protein: 5.0 + (i as f64 % 20.0),         // 5-25 arası
+                fat: 3.0 + (i as f64 % 15.0),             // 3-18 arası
+                saturated_fat: 1.0 + (i as f64 % 5.0),    // 1-6 arası
                 trans_fat: 0.0,
                 sugar: 10.0 + (i as f64 % 30.0), // 10-40 arası
-                fiber: 2.0 + (i as f64 % 8.0), // 2-10 arası
+                fiber: 2.0 + (i as f64 % 8.0),   // 2-10 arası
                 cholesterol: 0.0,
                 sodium: 50.0 + (i as f64 % 100.0), // 50-150 arası
                 potassium: 200.0 + (i as f64 % 300.0), // 200-500 arası
-                water: 80.0 + (i as f64 % 20.0), // 80-100 arası
-                iron: 1.0 + (i as f64 % 2.0), // 1-3 arası
+                water: 80.0 + (i as f64 % 20.0),   // 80-100 arası
+                iron: 1.0 + (i as f64 % 2.0),      // 1-3 arası
                 magnesium: 20.0 + (i as f64 % 40.0), // 20-60 arası
                 calcium: 30.0 + (i as f64 % 70.0), // 30-100 arası
-                zinc: 0.5 + (i as f64 % 1.5), // 0.5-2 arası
+                zinc: 0.5 + (i as f64 % 1.5),      // 0.5-2 arası
                 vitamin_a: 100.0 + (i as f64 % 200.0), // 100-300 arası
                 vitamin_b6: 0.1 + (i as f64 % 0.2), // 0.1-0.3 arası
                 vitamin_b12: 0.0,
                 vitamin_c: 50.0 + (i as f64 % 100.0), // 50-150 arası
-                vitamin_d: 5.0 + (i as f64 % 10.0), // 5-15 arası
-                vitamin_e: 2.0 + (i as f64 % 3.0), // 2-5 arası
-                vitamin_k: 10.0 + (i as f64 % 20.0), // 10-30 arası
+                vitamin_d: 5.0 + (i as f64 % 10.0),   // 5-15 arası
+                vitamin_e: 2.0 + (i as f64 % 3.0),    // 2-5 arası
+                vitamin_k: 10.0 + (i as f64 % 20.0),  // 10-30 arası
             });
         }
-        
+
         foods
     }
 
@@ -357,7 +378,7 @@ mod tests {
         let start = Instant::now();
         sort_foods_by_query(&mut foods, query).await; // .await ekle
         let duration = start.elapsed();
-        
+
         println!("100 foods: {:?}", duration);
         assert!(duration.as_millis() < 10);
         assert_eq!(foods.len(), 100);
@@ -370,7 +391,7 @@ mod tests {
         let start = Instant::now();
         sort_foods_by_query(&mut foods, query).await;
         let duration = start.elapsed();
-        
+
         println!("1000 foods: {:?}", duration);
         assert!(duration.as_millis() < 50);
         assert_eq!(foods.len(), 1000);
@@ -383,7 +404,7 @@ mod tests {
         let start = Instant::now();
         sort_foods_by_query(&mut foods, query).await;
         let duration = start.elapsed();
-        
+
         println!("5000 foods: {:?}", duration);
         assert!(duration.as_millis() < 250);
         assert_eq!(foods.len(), 5000);
@@ -393,21 +414,26 @@ mod tests {
     async fn performance_regression_test() {
         let sizes = [(100usize, 10u64), (1000usize, 50u64), (5000usize, 250u64)];
         let query = "kar";
-        
+
         for &(size, max_ms) in &sizes {
             println!("\nTesting {} foods (max {}ms)", size, max_ms);
-            
+
             let mut foods = generate_large_food_dataset(size);
             let start = Instant::now();
             sort_foods_by_query(&mut foods, query).await; // ✅ .await
             let duration = start.elapsed();
-            
+
             let ms = duration.as_millis();
-            
+
             println!("Duration: {}ms", ms);
-            
-            assert!(ms < max_ms as u128,
-                "{} foods için {}ms (max: {}ms)", size, ms, max_ms);
+
+            assert!(
+                ms < max_ms as u128,
+                "{} foods için {}ms (max: {}ms)",
+                size,
+                ms,
+                max_ms
+            );
             assert_eq!(foods.len(), size);
         }
     }
@@ -417,7 +443,7 @@ mod tests {
     async fn test_sort_by_query_prefix_match() {
         let mut foods = create_test_foods();
         sort_foods_by_query(&mut foods, "kar").await; // ✅ .await
-        
+
         assert_eq!(foods[0].slug, Some("karpuz".to_string()));
         assert_eq!(foods[1].slug, Some("makarna".to_string()));
         assert_eq!(foods[2].slug, Some("portakal".to_string()));
@@ -467,9 +493,9 @@ mod tests {
                 ..Default::default()
             },
         ];
-        
+
         sort_foods_by_query(&mut foods, "kaşar").await;
-        
+
         // Başlangıçta olan en yüksek skor almalı (20 puan)
         assert_eq!(foods[0].slug, Some("baslangic".to_string()));
         // Sonra ortada olan (orta pozisyon puanı)
@@ -482,7 +508,7 @@ mod tests {
     async fn test_sort_by_query_no_match() {
         let mut foods = create_test_foods();
         let original_order = foods.clone();
-        
+
         sort_foods_by_query(&mut foods, "xyz").await; // Hiçbir şeyle eşleşmez
 
         // Sıralama değişmemeli (hepsi 0 skor)
@@ -493,7 +519,7 @@ mod tests {
     async fn test_sort_by_query_empty_query() {
         let mut foods = create_test_foods();
         let original_order = foods.clone();
-        
+
         sort_foods_by_query(&mut foods, "").await;
 
         // Boş query ile sıralama değişmemeli
@@ -504,18 +530,18 @@ mod tests {
     async fn test_sort_by_query_empty_vec() {
         let mut foods: Vec<Food> = vec![];
         let original = foods.clone();
-        
+
         sort_foods_by_query(&mut foods, "test").await;
-        
+
         assert_eq!(foods, original);
     }
 
     #[tokio::test]
     async fn test_sort_by_query_case_insensitive() {
         let mut foods = create_test_foods();
-        
+
         sort_foods_by_query(&mut foods, "KaR").await;
-        
+
         // Büyük/küçük harf duyarlılığı olmamalı
         assert_eq!(foods[0].slug, Some("karpuz".to_string()));
     }
@@ -549,10 +575,10 @@ mod tests {
                 ..Default::default()
             },
         ];
-        
+
         let original_order = foods.clone();
         sort_foods_by_query(&mut foods, "ka").await;
-        
+
         // Aynı skorlu elementler orijinal sıralarını korumalı
         assert_eq!(foods, original_order);
     }
