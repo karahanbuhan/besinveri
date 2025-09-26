@@ -15,6 +15,7 @@ pub(crate) struct Config {
 #[derive(Serialize, Deserialize)]
 pub(crate) struct APIConfig {
     pub(crate) base_url: String,
+    pub(crate) static_url: String,
 }
 
 pub(crate) fn load_config_with_defaults() -> Result<Config, Error> {
@@ -35,6 +36,7 @@ fn get_default_config() -> Config {
     Config {
         api: APIConfig {
             base_url: "https://api.besinveri.com".to_owned(),
+            static_url: "https://besinveri.com/static".to_owned()
         },
     }
 }

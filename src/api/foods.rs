@@ -120,7 +120,7 @@ pub(crate) async fn get_foods_search_handler(
 
 async fn fix_image_urls(State(shared_state): &State<SharedState>, foods: &mut Vec<Food>) {
     // Eğer bir yemeğin resim URL'si / ile başlıyorsa, örneğin /images/muz.webp gibi, https://api.besinveri.com/images/muz.webp formatına getirilmeli
-    let base_url = &shared_state.config.lock().await.api.base_url;
+    let base_url = &shared_state.config.lock().await.api.static_url;
     foods
         .iter_mut()
         .filter(|food| food.image_url.starts_with("/"))
@@ -130,7 +130,7 @@ async fn fix_image_urls(State(shared_state): &State<SharedState>, foods: &mut Ve
 async fn fix_image_url(State(shared_state): &State<SharedState>, food: &mut Food) {
     // Eğer yemeğin resim URL'si / ile başlıyorsa, örneğin /images/muz.webp gibi, https://api.besinveri.com/images/muz.webp formatına getirilmeli
     if food.image_url.starts_with("/") {
-        let base_url = &shared_state.config.lock().await.api.base_url;
+        let base_url = &shared_state.config.lock().await.api.static_url;
         food.image_url = format!("{}{}", base_url, food.image_url);
     }
 }
