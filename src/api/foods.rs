@@ -179,7 +179,7 @@ mod tests {
 
     // Test verisi oluşturan helper fonksiyonlar
     fn create_test_foods() -> Vec<Food> {
-        let mut servings = HashMap::new();
+        let mut servings = BTreeMap::new();
         servings.insert("portion".to_string(), 100.0);
 
         vec![
@@ -332,7 +332,7 @@ mod tests {
 
     fn generate_large_food_dataset(size: usize) -> Vec<Food> {
         let mut foods = Vec::with_capacity(size);
-        let mut servings = HashMap::new();
+        let mut servings = BTreeMap::new();
         servings.insert("portion".to_string(), 100.0);
 
         for i in 0..size {
@@ -477,7 +477,7 @@ mod tests {
                 source: "".to_string(),
                 tags: vec![],
                 allergens: vec![],
-                servings: HashMap::new(),
+                servings: BTreeMap::new(),
                 ..Default::default()
             },
             // "kaşar" ortada
@@ -490,7 +490,7 @@ mod tests {
                 source: "".to_string(),
                 tags: vec![],
                 allergens: vec![],
-                servings: HashMap::new(),
+                servings: BTreeMap::new(),
                 ..Default::default()
             },
             // "kaşar" sonda
@@ -503,7 +503,7 @@ mod tests {
                 source: "".to_string(),
                 tags: vec![],
                 allergens: vec![],
-                servings: HashMap::new(),
+                servings: BTreeMap::new(),
                 ..Default::default()
             },
         ];
@@ -573,7 +573,7 @@ mod tests {
                 source: "".to_string(),
                 tags: vec![],
                 allergens: vec![],
-                servings: HashMap::new(),
+                servings: BTreeMap::new(),
                 ..Default::default()
             },
             Food {
@@ -585,7 +585,7 @@ mod tests {
                 source: "".to_string(),
                 tags: vec![],
                 allergens: vec![],
-                servings: HashMap::new(),
+                servings: BTreeMap::new(),
                 ..Default::default()
             },
         ];

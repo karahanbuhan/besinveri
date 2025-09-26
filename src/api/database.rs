@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::{collections::{BTreeMap, HashMap}, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
@@ -331,8 +331,8 @@ async fn select_food_tags_by_food_id(
 async fn select_food_servings_by_food_id(
     pool: &SqlitePool,
     food_id: i64,
-) -> Result<HashMap<String, f64>, Error> {
-    let mut servings: HashMap<String, f64> = HashMap::new();
+) -> Result<BTreeMap<String, f64>, Error> {
+    let mut servings: BTreeMap<String, f64> = BTreeMap::new();
 
     for row in
         sqlx::query("SELECT serving_description_id, weight FROM food_servings WHERE (food_id = ?)")
@@ -539,7 +539,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["test".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 50.0,
             energy: 100.0,
             carbohydrate: 20.0,
@@ -663,7 +663,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["meyve".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 40.0,
             energy: 50.0,
             carbohydrate: 10.0,
@@ -699,7 +699,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["meyve".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 60.0,
             energy: 90.0,
             carbohydrate: 20.0,
@@ -792,7 +792,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["test".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 50.0,
             energy: 100.0,
             carbohydrate: 20.0,
@@ -863,7 +863,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["fruit".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 40.0,
             energy: 52.0,
             carbohydrate: 14.0,
@@ -899,7 +899,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["fruit".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 51.0,
             energy: 89.0,
             carbohydrate: 23.0,
@@ -959,7 +959,7 @@ mod tests {
             source: "test_source".to_string(),
             tags: vec!["test".to_string()],
             allergens: vec![],
-            servings: std::collections::HashMap::new(),
+            servings: std::collections::BTreeMap::new(),
             glycemic_index: 50.0,
             energy: 100.0,
             carbohydrate: 20.0,

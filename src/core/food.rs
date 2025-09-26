@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +13,7 @@ pub(crate) struct Food {
     pub(crate) source: String,
     pub(crate) tags: Vec<String>,
     pub(crate) allergens: Vec<String>,
-    pub(crate) servings: HashMap<String, f64>,
+    pub(crate) servings: BTreeMap<String, f64>,
     pub(crate) glycemic_index: f64,
     pub(crate) energy: f64,
     pub(crate) carbohydrate: f64,
