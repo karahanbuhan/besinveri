@@ -1,11 +1,11 @@
-use std::{collections::{BTreeMap, HashMap}, fs};
+use std::{collections::{BTreeMap}, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
 use sqlx::{Encode, Pool, Row, Sqlite, SqlitePool, Type, sqlite::SqliteRow};
 use tracing::{info, warn};
 
-pub(crate) async fn connect() -> Result<Pool<Sqlite>, Error> {
+pub(crate) async fn connect_database() -> Result<Pool<Sqlite>, Error> {
     // Veritabanı olarak SQLite kullanıyoruz, db/foods.sqlite dizininde olacak şekilde
     fs::create_dir_all("db").expect("db/ dizini oluşturulamadı");
     let database_url = "sqlite:db/foods.sqlite?mode=rwc"; // rwc mod sayesinde eğer veritabanı dosyası yoksa oluşturuyoruz
@@ -522,7 +522,7 @@ mod tests {
     async fn test_connect_and_migrate() -> Result<(), Error> {
         // In-memory veritabanı ile test
         let _pool = SqlitePool::connect("sqlite::memory:").await?;
-        let _db_pool = connect().await?; // Gerçek dosya tablosu ile test için yorum satırını kaldır
+        let _db_pool = connect_database().await?; // Gerçek dosya tablosu ile test için yorum satırını kaldır
         info!("Veritabanı bağlantısı ve migration testi geçti.");
         Ok(())
     }

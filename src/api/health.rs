@@ -3,10 +3,10 @@ use chrono::{FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
-pub(crate) struct ServerStatus {
+pub(crate) struct ServerHealth {
     name: &'static str,
     version: &'static str,
-    status: &'static str,
+    health: &'static str,
     documentation: &'static str,
     last_updated: String,
 }
@@ -14,17 +14,17 @@ pub(crate) struct ServerStatus {
 // Cargo bize environment üzerinden sürümü sağlıyor, manuel girmeye gerek yok
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub(crate) async fn get_status_handler() -> Json<ServerStatus> {
+pub(crate) async fn get_health_handler() -> Json<ServerHealth> {
     let timestamp = {
         let utc_time = Utc::now();
         let turkish_offset = FixedOffset::east_opt(3 * 3600).unwrap(); // +3 saat
         utc_time.with_timezone(&turkish_offset).to_rfc3339() // ör: 2025-09-13T21:42:35.785219+03:00 (ISO 8601)
     };
 
-    let status = ServerStatus {
+    let status = ServerHealth {
         name: "BesinVeri API",
         version: VERSION,
-        status: "iyi",
+        health: "iyi",
         documentation: "https://github.com/karahanbuhan/besinveri",
         last_updated: timestamp,
     };
@@ -53,15 +53,15 @@ mod tests {
         };
 
         // Handler’ı çağır
-        let response = get_status_handler().await;
+        let response = get_health_handler().await;
 
         // JSON yanıtını al
-        let status: ServerStatus = response.0;
+        let status: ServerHealth = response.0;
 
         // Beklenen değerleri kontrol et
         assert_eq!(status.name, "BesinVeri API");
         assert_eq!(status.version, VERSION);
-        assert_eq!(status.status, "iyi");
+        assert_eq!(status.health, "iyi");
         assert_eq!(
             status.documentation,
             "https://github.com/karahanbuhan/besinveri"
@@ -87,7 +87,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_status_handler_http() {
         // Router oluştur
-        let app = axum::Router::new().route("/api/status", axum::routing::get(get_status_handler));
+        let app = axum::Router::new().route("/api/status", axum::routing::get(get_health_handler));
 
         // HTTP isteği oluştur
         let request = Request::builder()

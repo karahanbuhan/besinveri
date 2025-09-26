@@ -62,15 +62,15 @@ pub(crate) async fn get_foods_handler(
         slugs
             .into_iter()
             .map(|slug| slug)
-            // Daha sonra fuji-elma: https://API_BASE.URL/foods/food1\n.../food2 şeklinde gösteriyoruz
-            .map(|slug| (slug.clone(), api_base_url.clone() + "/foods/" + &slug))
+            // Daha sonra fuji-elma: https://API_BASE.URL/food/food1\n.../food2 şeklinde gösteriyoruz
+            .map(|slug| (slug.clone(), api_base_url.clone() + "/food/" + &slug))
             .collect(),
     ))
 }
 
 #[derive(Deserialize)]
 pub(crate) struct SearchParams {
-    query: String,
+    q: String,
     mode: String,
     limit: u64,
 }
@@ -86,21 +86,21 @@ pub(crate) async fn get_foods_search_handler(
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
             let db = &*shared_state.api_db.lock().await;
-            let mut foods = database::search_food_by_description_wild(db, &params.query, params.limit).await.map_err(|e| {
-                            error!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.query, params.mode, params.limit, e);
+            let mut foods = database::search_food_by_description_wild(db, &params.q, params.limit).await.map_err(|e| {
+                            error!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, params.mode, params.limit, e);
                             (StatusCode::NOT_FOUND, "İsim ile yemek ararken sonuç bulunamadı")
             })?;
 
             // Yemeklerin alakasına göre sıralıyoruz, örneğin query=Elm için 1. Elma, 2. Fuji Elma ... gibi
-            sort_foods_by_query(&mut foods, &params.query).await;
+            sort_foods_by_query(&mut foods, &params.q).await;
 
             Ok(foods)
         }
 
         "tag" => {
             let db = &*shared_state.api_db.lock().await;
-            let foods = database::search_food_by_tag_wild(db, &params.query, params.limit).await.map_err(|e| {
-                    error!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.query, params.mode, params.limit, e);
+            let foods = database::search_food_by_tag_wild(db, &params.q, params.limit).await.map_err(|e| {
+                    error!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, params.mode, params.limit, e);
                     (StatusCode::NOT_FOUND, "Etiket ile yemek ararken sonuç bulunamadı")
                 })?;
 
@@ -174,7 +174,6 @@ async fn sort_foods_by_query(foods: &mut Vec<Food>, query: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use std::time::Instant;
 
     // Test verisi oluşturan helper fonksiyonlar
