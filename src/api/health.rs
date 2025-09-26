@@ -110,7 +110,7 @@ mod tests {
 
         // Alanları kontrol et
         assert_eq!(json["name"].as_str(), Some("BesinVeri API"));
-        assert_eq!(json["status"].as_str(), Some("iyi"));
+        assert_eq!(json["health"].as_str(), Some("iyi"));
         let actual_last_updated = json["last_updated"].as_str().unwrap_or("");
 
         let now = {
