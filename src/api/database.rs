@@ -227,7 +227,7 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
 pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<String>, Error> {
     let mut slugs: Vec<String> = Vec::new();
 
-    for row in sqlx::query("SELECT slug FROM foods")
+    for row in sqlx::query("SELECT slug FROM foods WHERE verified=1")
         .fetch_all(pool)
         .await?
     {

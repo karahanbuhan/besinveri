@@ -28,6 +28,17 @@ pub(crate) async fn get_food_handler(
 
     fix_image_url(&State(shared_state), &mut food).await;
 
+    if food.verified.is_none_or(|verified| !verified) {
+        error!(
+            "Onaylanmamış yemeğe erişim yapılmaya çalışıldı {}",
+            food.slug.unwrap_or("".to_owned())
+        );
+        return Err((
+            StatusCode::NOT_FOUND,
+            "Bu yemek henüz onaylanmadığı için gösterilemiyor",
+        ));
+    }
+
     Ok(Json(food))
 }
 
@@ -98,6 +109,9 @@ pub(crate) async fn get_foods_search_handler(
 
         _ => Err((StatusCode::BAD_REQUEST, "Geçersiz sorgu!")),
     }?;
+
+    // Onaylanmamış yemekleri döndürmüyoruz
+    foods.retain(|food| food.verified.unwrap_or(false));
 
     fix_image_urls(&State(shared_state), &mut foods).await;
 
