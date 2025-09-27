@@ -16,6 +16,7 @@ pub(crate) struct Config {
 pub(crate) struct APIConfig {
     pub(crate) base_url: String,
     pub(crate) static_url: String,
+    pub(crate) search_max_limit: u64,
 }
 
 pub(crate) fn load_config_with_defaults() -> Result<Config, Error> {
@@ -36,7 +37,8 @@ fn get_default_config() -> Config {
     Config {
         api: APIConfig {
             base_url: "https://api.besinveri.com".to_owned(),
-            static_url: "https://besinveri.com/static".to_owned()
+            static_url: "https://besinveri.com/static".to_owned(),
+            search_max_limit: 10,
         },
     }
 }

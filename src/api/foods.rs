@@ -71,8 +71,8 @@ pub(crate) async fn get_foods_handler(
 #[derive(Deserialize)]
 pub(crate) struct SearchParams {
     q: String,
-    mode: String,
-    limit: u64,
+    mode: Option<String>,
+    limit: Option<u64>,
 }
 
 pub(crate) async fn get_foods_search_handler(
@@ -80,14 +80,25 @@ pub(crate) async fn get_foods_search_handler(
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Vec<Food>>, (StatusCode, &'static str)> {
     // Moda göre uygun veritabanı sorgusunu atıyoruz
-    let mode = params.mode.to_lowercase();
+    let mode = match &params.mode {
+        Some(mode) => mode.to_lowercase(),
+        None => "description".to_owned()
+    };
+
+    // Eğer limit girilmemişse ilk 5 sonucu varsayılan olarak döndüreceğiz çünkü arama menülerinde genellikle bu şekilde kullanılıyor
+    // Bu limiti daha sonra ekleyeceğiz, sort yapmadan önce eklersek asıl göstermemiz gereken en alakalı yemekleri gösteremeyebiliriz 
+    let limit = params.limit.unwrap_or(5);
+    if limit > shared_state.config.lock().await.api.search_max_limit {
+        error!("Arama limiti geçildi, limit={} çok yüksek!", limit);
+        return Err((StatusCode::BAD_REQUEST, "Arama limitini geçtiniz!"));
+    }
 
     let mut foods = match mode.as_str() {
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
             let db = &*shared_state.api_db.lock().await;
-            let mut foods = database::search_food_by_description_wild(db, &params.q, params.limit).await.map_err(|e| {
-                            error!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, params.mode, params.limit, e);
+            let mut foods = database::search_food_by_description_wild(db, &params.q).await.map_err(|e| {
+                            error!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, mode, limit, e);
                             (StatusCode::NOT_FOUND, "İsim ile yemek ararken sonuç bulunamadı")
             })?;
 
@@ -99,8 +110,8 @@ pub(crate) async fn get_foods_search_handler(
 
         "tag" => {
             let db = &*shared_state.api_db.lock().await;
-            let foods = database::search_food_by_tag_wild(db, &params.q, params.limit).await.map_err(|e| {
-                    error!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, params.mode, params.limit, e);
+            let foods = database::search_food_by_tag_wild(db, &params.q).await.map_err(|e| {
+                    error!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, mode, limit, e);
                     (StatusCode::NOT_FOUND, "Etiket ile yemek ararken sonuç bulunamadı")
                 })?;
 
@@ -112,7 +123,9 @@ pub(crate) async fn get_foods_search_handler(
 
     // Onaylanmamış yemekleri döndürmüyoruz
     foods.retain(|food| food.verified.unwrap_or(false));
-
+    // Sadece limit kadar yemeğe ihtiyacımız var, gerisini siliyoruz
+    foods.truncate(limit as usize);
+    // Kalan yemeklerin de resim URL'lerini düzeltiyoruz
     fix_image_urls(&State(shared_state), &mut foods).await;
 
     Ok(Json(foods))

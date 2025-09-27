@@ -1,4 +1,4 @@
-use std::{collections::{BTreeMap}, fs};
+use std::{collections::BTreeMap, fs};
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
@@ -369,15 +369,11 @@ async fn select_foods_where(
     pool: &SqlitePool,
     condition: &str,
     binding: &str,
-    limit: u64,
 ) -> Result<Vec<Food>, Error> {
-    let rows = sqlx::query(&format!(
-        "SELECT * FROM foods WHERE {} LIMIT {}",
-        condition, limit
-    ))
-    .bind(binding)
-    .fetch_all(pool)
-    .await?;
+    let rows = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
+        .bind(binding)
+        .fetch_all(pool)
+        .await?;
 
     let mut foods: Vec<Food> = Vec::new();
     for row in rows {
@@ -434,16 +430,12 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Resu
 pub(crate) async fn search_food_by_tag_wild(
     pool: &SqlitePool,
     tag: &str,
-    limit: u64,
 ) -> Result<Vec<Food>, Error> {
     // Tag seçmeliyiz önce description'a like atarak tags'de
-    let tags_row = sqlx::query(&format!(
-        "SELECT * FROM tags WHERE description LIKE ? LIMIT {}",
-        limit
-    ))
-    .bind(format!("%{}%", tag))
-    .fetch_all(pool)
-    .await?;
+    let tags_row = sqlx::query(&format!("SELECT * FROM tags WHERE description LIKE ?",))
+        .bind(format!("%{}%", tag))
+        .fetch_all(pool)
+        .await?;
     let mut tags: Vec<(i64, String)> = Vec::new();
     for tag_row in tags_row {
         tags.push((tag_row.try_get("id")?, tag_row.try_get("description")?));
@@ -452,13 +444,10 @@ pub(crate) async fn search_food_by_tag_wild(
     // Sonrasında dönen tag_id'leri food_tags'te aratıp yemekleri döndürmeliyiz
     let mut foods: Vec<Food> = Vec::new();
     for (tag_id, _) in tags {
-        let food_ids = sqlx::query(&format!(
-            "SELECT food_id FROM food_tags WHERE tag_id = ? LIMIT {}",
-            limit
-        ))
-        .bind(tag_id)
-        .fetch_all(pool)
-        .await?;
+        let food_ids = sqlx::query(&format!("SELECT food_id FROM food_tags WHERE tag_id = ?",))
+            .bind(tag_id)
+            .fetch_all(pool)
+            .await?;
 
         for food_id in food_ids {
             let food_id: i64 = food_id.try_get("food_id")?;
@@ -472,14 +461,12 @@ pub(crate) async fn search_food_by_tag_wild(
 pub(crate) async fn search_food_by_description_wild(
     pool: &SqlitePool,
     description: &str,
-    limit: u64,
 ) -> Result<Vec<Food>, Error> {
     // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
     select_foods_where(
         pool,
         &format!("description LIKE ?"),
         &format!("%{}%", description),
-        limit,
     )
     .await
 }
