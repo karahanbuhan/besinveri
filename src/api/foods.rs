@@ -8,7 +8,7 @@ use axum::{
 
 use anyhow::Result;
 use serde::Deserialize;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{SharedState, api::database, core::food::Food};
 
