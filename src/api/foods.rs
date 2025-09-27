@@ -8,7 +8,7 @@ use axum::{
 
 use anyhow::Result;
 use serde::Deserialize;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{SharedState, api::database, core::food::Food};
 
@@ -70,23 +70,45 @@ pub(crate) async fn get_foods_handler(
 
 #[derive(Deserialize)]
 pub(crate) struct SearchParams {
+    // Sorgu değeri: q
     q: String,
     mode: Option<String>,
     limit: Option<u64>,
+}
+
+impl SearchParams {
+    fn size(self: &SearchParams) -> usize {
+        let query_size = self.q.len();
+        let mode_size = self.mode.as_ref().map_or(0, |m| m.len());
+        // SearchParams'ın statik boyutunu da ekliyoruz
+        size_of::<SearchParams>() + query_size + mode_size
+    }
 }
 
 pub(crate) async fn get_foods_search_handler(
     params: Query<SearchParams>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Vec<Food>>, (StatusCode, &'static str)> {
+    // Parametrelerin boyutunun 96 baytı geçmesini beklemiyoruz, DoS tarzı saldırıları önlemek için böyle bir önlem alıyoruz
+    if params.size() > 96 {
+        error!(
+            "Parametre boyutu {} bayt! Limit 96 baytı geçiyor.",
+            params.size()
+        );
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "Gönderdiğiniz sorgu 96 bayt limitini aşıyor!",
+        ));
+    }
+
     // Moda göre uygun veritabanı sorgusunu atıyoruz
     let mode = match &params.mode {
         Some(mode) => mode.to_lowercase(),
-        None => "description".to_owned()
+        None => "description".to_owned(),
     };
 
     // Eğer limit girilmemişse ilk 5 sonucu varsayılan olarak döndüreceğiz çünkü arama menülerinde genellikle bu şekilde kullanılıyor
-    // Bu limiti daha sonra ekleyeceğiz, sort yapmadan önce eklersek asıl göstermemiz gereken en alakalı yemekleri gösteremeyebiliriz 
+    // Bu limiti daha sonra ekleyeceğiz, sort yapmadan önce eklersek asıl göstermemiz gereken en alakalı yemekleri gösteremeyebiliriz
     let limit = params.limit.unwrap_or(5);
     if limit > shared_state.config.lock().await.api.search_max_limit {
         error!("Arama limiti geçildi, limit={} çok yüksek!", limit);
