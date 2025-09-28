@@ -24,8 +24,8 @@ pub(crate) struct ServerHealth {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct ServerHealthDetails {
-    internet: bool,
-    database: bool,
+    internet_connection: bool,
+    database_functionality: bool,
 }
 
 // Cargo bize environment üzerinden sürümü sağlıyor, manuel girmeye gerek yok
@@ -40,15 +40,13 @@ pub(crate) async fn get_health_handler(
         utc_time.with_timezone(&turkish_offset).to_rfc3339() // ör: 2025-09-13T21:42:35.785219+03:00 (ISO 8601)
     };
 
-    let is_connected_to_internet = check_internet(
-        &shared_state
+    // URL'lere klon atmadan yaparsak Mutex'i serbest bırakmadığımız için config'i blokluyor, yani diğer bağlantıları bloklamaması için urlleri klonluyoruz
+    // Zaten bir URL'ye ping atmak birkaç yüz ms sürdüğü için buradaki klon ne RAM ne de hız olarak önemli bir etkiye sebep olacak
+    let urls = &shared_state
             .config
             .lock()
-            .await
-            .api
-            .health_internet_check_urls,
-    )
-    .await;
+            .await.api.health_internet_check_urls.clone();
+    let is_connected_to_internet = check_internet(urls).await;
     let is_database_functional = check_database(&*shared_state.api_db.lock().await).await;
 
     let health = ServerHealth {
@@ -60,8 +58,8 @@ pub(crate) async fn get_health_handler(
             "unhealthy"
         },
         details: ServerHealthDetails {
-            internet: is_connected_to_internet,
-            database: is_database_functional,
+            internet_connection: is_connected_to_internet,
+            database_functionality: is_database_functional,
         },
         documentation: "https://github.com/karahanbuhan/besinveri",
         source_code: "https://github.com/karahanbuhan/besinveri",
