@@ -2,3 +2,4 @@
 base_url = "https://api.besinveri.com"
 static_url = "https://besinveri.com/static"
 search_max_limit = 10
+health_internet_check_urls = ["https://www.google.com", "https://github.com", "https://www.wikipedia.org"]
