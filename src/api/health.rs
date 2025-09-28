@@ -43,9 +43,12 @@ pub(crate) async fn get_health_handler(
     // URL'lere klon atmadan yaparsak Mutex'i serbest bırakmadığımız için config'i blokluyor, yani diğer bağlantıları bloklamaması için urlleri klonluyoruz
     // Zaten bir URL'ye ping atmak birkaç yüz ms sürdüğü için buradaki klon ne RAM ne de hız olarak önemli bir etkiye sebep olacak
     let urls = &shared_state
-            .config
-            .lock()
-            .await.api.health_internet_check_urls.clone();
+        .config
+        .lock()
+        .await
+        .api
+        .health_internet_check_urls
+        .clone();
     let is_connected_to_internet = check_internet(urls).await;
     let is_database_functional = check_database(&*shared_state.api_db.lock().await).await;
 
