@@ -1,7 +1,10 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Error;
-use axum::{Router, routing::get};
+use axum::{routing::get, Router};
+use axum_governor::GovernorLayer;
+use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
+use real::RealIpLayer;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 
@@ -29,6 +32,14 @@ async fn main() -> Result<(), Error> {
         config: Arc::new(Mutex::new(core::config::load_config_with_defaults()?)),
     };
 
+    // Lazy-limit ile rate-limit ayarlıyoruz, şimdilik basit bir sistem kullanıyoruz; 1 saniyede maksimum 5 istek.
+    // Gelecekte kova mantığına geçilebilir ama şimdilik bu sistemin yeterli olması gerekli
+    init_rate_limiter!(
+        default: RuleConfig::new(Duration::Seconds(1), 5),
+        max_memory: Some(64 * 1024 * 1024) // 64MB maksimum bellek
+    )
+    .await;
+
     let router = Router::new()
         // Burada handler yerine sadece statik bir endpoints JSON'ı oluşturuyoruz
         .route(
@@ -44,7 +55,13 @@ async fn main() -> Result<(), Error> {
             "/api/foods/search",
             get(api::foods::get_foods_search_handler),
         )
-        .with_state(shared_state.clone());
+        .with_state(shared_state.clone())
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(RealIpLayer::default()) // Bu katman rate limiter için
+                .layer(GovernorLayer::default()),
+        )
+        .into_make_service_with_connect_info::<SocketAddr>(); // Rate limiter için socket adreslere ihtiyacımız var
 
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
 

@@ -6,7 +6,15 @@ from datetime import datetime
 # Test edilecek URL'ler
 URLS = [
     "http://localhost:8099/api/health",
-    "http://localhost:8099/api/foods/list",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
 ]
 
 

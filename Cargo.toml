@@ -12,7 +12,10 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["macros"] }
+axum-governor = "1.0.2"
 chrono = "0.4.42"
+lazy-limit = "1.0.1"
+real = { version = "0.1.4", features = ["axum"] }
 reqwest = "0.12.23"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
