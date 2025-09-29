@@ -1,12 +1,14 @@
 use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Error;
-use axum::{routing::get, Router};
+use axum::{Router, ServiceExt, extract::Request, routing::get};
 use axum_governor::GovernorLayer;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use real::RealIpLayer;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
+use tower::Layer;
+use tower_http::normalize_path::NormalizePathLayer;
 
 use crate::core::config::Config;
 
@@ -41,7 +43,6 @@ async fn main() -> Result<(), Error> {
     .await;
 
     let router = Router::new()
-        // Burada handler yerine sadece statik bir endpoints JSON'ı oluşturuyoruz
         .route(
             "/api",
             get(
@@ -58,10 +59,13 @@ async fn main() -> Result<(), Error> {
         .with_state(shared_state.clone())
         .layer(
             tower::ServiceBuilder::new()
-                .layer(RealIpLayer::default()) // Bu katman rate limiter için
-                .layer(GovernorLayer::default()),
-        )
-        .into_make_service_with_connect_info::<SocketAddr>(); // Rate limiter için socket adreslere ihtiyacımız var
+                .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
+                .layer(GovernorLayer::default()), // Bu katman rate limiter için
+        );
+    // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
+    let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
+        NormalizePathLayer::trim_trailing_slash().layer(router),
+    );
 
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
 
