@@ -55,7 +55,7 @@ async fn cache_middleware(
 ) -> Result<Response, StatusCode> {
     let url = request.uri().to_string();
     let ttl = match request.uri().path() {
-        "/api" => std::time::Duration::MAX, // Endpointler zaten statik o yüzden bir defa cache atmamız yeterli
+        "/api" | "/api/foods" => std::time::Duration::MAX, // Bu 2 endpoint zaten statik o yüzden bir defa cache atmamız yeterli,
         "/api/health" => std::time::Duration::from_secs(600), // Timestamp attığı ve anlık önemli olduğu için 10 dakikada 1 cache
         path if path.starts_with("/api/food") => std::time::Duration::from_secs(28800), // 8 saatte bir diğer yemek endpointleri için şimdilik güzel
         _ => std::time::Duration::from_secs(3600), // Varsayılan 1 saat, başka bir endpoint yok ama yine de ekleyelim
