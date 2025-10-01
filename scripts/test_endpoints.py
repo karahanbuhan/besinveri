@@ -4,17 +4,26 @@ import time
 from datetime import datetime
 
 # Test edilecek URL'ler
+URLS_O = [
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/health",
+]
+
 URLS = [
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
-    "http://localhost:8099/api/health",
+    "http://localhost:8099/api/foods/search?q=A",
+    "http://localhost:8099/api/foods/search?q=A",
+    "http://localhost:8099/api/foods/search?q=A",
+    "http://localhost:8099/api/foods/search?q=A",
+    "http://localhost:8099/api/foods/search?q=A",
+    "http://localhost:8099/api/foods/search?q=A"
 ]
 
 

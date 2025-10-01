@@ -31,7 +31,7 @@ pub(crate) struct ServerHealthDetails {
 // Cargo bize environment üzerinden sürümü sağlıyor, manuel girmeye gerek yok
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub(crate) async fn get_health_handler(
+pub(crate) async fn health(
     State(shared_state): State<SharedState>,
 ) -> Json<ServerHealth> {
     let timestamp = {
@@ -53,7 +53,7 @@ pub(crate) async fn get_health_handler(
     let is_database_functional = check_database(&*shared_state.api_db.lock().await).await;
 
     let health = ServerHealth {
-        name: "BesinVeri API",
+        name: "besinveri-api",
         version: VERSION,
         status: if is_connected_to_internet && is_database_functional {
             "healthy"

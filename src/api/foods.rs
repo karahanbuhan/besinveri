@@ -12,7 +12,7 @@ use tracing::error;
 
 use crate::{SharedState, api::database, core::food::Food};
 
-pub(crate) async fn get_food_handler(
+pub(crate) async fn food(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, (StatusCode, &'static str)> {
@@ -43,7 +43,7 @@ pub(crate) async fn get_food_handler(
 }
 
 // HashMap yerine BTreeMap kullanma sebebimiz, yemek isimlerini alfabetik sıralamak istememiz. HashMap kullansaydık her seferinde rastgele sıralama olacaktı
-pub(crate) async fn get_foods_handler(
+pub(crate) async fn foods_list(
     State(shared_state): State<SharedState>,
 ) -> Result<Json<BTreeMap<String, String>>, (StatusCode, &'static str)> {
     let slugs = database::select_all_foods_slugs(&*shared_state.api_db.lock().await)
@@ -85,7 +85,7 @@ impl SearchParams {
     }
 }
 
-pub(crate) async fn get_foods_search_handler(
+pub(crate) async fn foods_search(
     params: Query<SearchParams>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Vec<Food>>, (StatusCode, &'static str)> {

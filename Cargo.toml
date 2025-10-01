@@ -15,6 +15,7 @@ axum = { version = "0.8.4", features = ["macros"] }
 axum-governor = "1.0.2"
 chrono = "0.4.42"
 lazy-limit = "1.0.1"
+moka = { version = "0.12.11", features = ["future"] }
 real = { version = "0.1.4", features = ["axum"] }
 reqwest = "0.12.23"
 serde = { version = "1.0.219", features = ["derive"] }
@@ -27,6 +28,6 @@ sqlx = { version = "0.8.6", features = [
 tokio = { version = "1.47.1", features = ["full"] }
 toml = "0.9.6"
 tower = "0.5.2"
-tower-http = { version = "0.6.6", features = ["normalize-path"] }
+tower-http = { version = "0.6.6", features = ["normalize-path", "set-header"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["fmt", "time"] }
