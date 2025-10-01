@@ -42,6 +42,26 @@ pub(crate) async fn food(
     Ok(Json(food))
 }
 
+pub(crate) async fn foods(State(shared_state): State<SharedState>) -> Json<BTreeMap<&'static str, String>> {
+    // Henüz test etmedim ama ne olur ne olmaz diye to_owned atıyorum birkaç ms olsa bile config'e blok atılmaması için
+    let api_base_url = &shared_state.config.lock().await.api.base_url.to_owned();
+    let mut endpoints: BTreeMap<&'static str, String> = BTreeMap::new();
+
+    endpoints.insert(
+        "list_all_foods_url",
+        format!("{}/{}", &api_base_url, "foods/list"),
+    );
+    endpoints.insert(
+        "search_food_url",
+        format!(
+            "{}/{}",
+            api_base_url, "foods/search?q={query}&mode={description, tag}&limit={limit}"
+        ),
+    );
+
+    Json(endpoints)
+}
+
 // HashMap yerine BTreeMap kullanma sebebimiz, yemek isimlerini alfabetik sıralamak istememiz. HashMap kullansaydık her seferinde rastgele sıralama olacaktı
 pub(crate) async fn foods_list(
     State(shared_state): State<SharedState>,

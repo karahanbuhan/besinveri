@@ -122,6 +122,7 @@ async fn main() -> Result<(), Error> {
         .route("/api", get(api::endpoints::endpoints))
         .route("/api/health", get(api::health::health))
         .route("/api/food/{slug}", get(api::foods::food))
+        .route("/api/foods", get(api::foods::foods))
         .route("/api/foods/list", get(api::foods::foods_list))
         .route("/api/foods/search", get(api::foods::foods_search))
         .with_state(shared_state.clone())
