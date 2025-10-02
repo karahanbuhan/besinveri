@@ -37,13 +37,19 @@ struct SharedState {
 
 impl SharedState {
     async fn new() -> Result<Self, Error> {
+        let api_db = Arc::new(Mutex::new(api::database::connect_database().await?));
+        let config = Arc::new(Mutex::new(core::config::load_config_with_defaults()?));
+
+        let cache_capacity = config.lock().await.core.cache_capacity;
+        let cache = Cache::builder()
+            .max_capacity(cache_capacity)
+            .time_to_live(std::time::Duration::from_secs(10 * 60))
+            .build();
+
         Ok(Self {
-            api_db: Arc::new(Mutex::new(api::database::connect_database().await?)),
-            config: Arc::new(Mutex::new(core::config::load_config_with_defaults()?)),
-            cache: Cache::builder() // Maksimum 1000 öğeli ve varsayılan TTL 10 dakika önbellek oluşturuyoruz
-                .max_capacity(1000)
-                .time_to_live(std::time::Duration::from_secs(10 * 60))
-                .build(),
+            api_db,
+            config,
+            cache,
         })
     }
 }

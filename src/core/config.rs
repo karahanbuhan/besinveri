@@ -9,7 +9,13 @@ use tracing::{debug, info};
 
 #[derive(Serialize, Deserialize)]
 pub(crate) struct Config {
+    pub(crate) core: CoreConfig,
     pub(crate) api: APIConfig,
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) struct CoreConfig {
+    pub(crate) cache_capacity: u64,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -36,11 +42,18 @@ pub(crate) fn load_config_with_defaults() -> Result<Config, Error> {
 
 fn get_default_config() -> Config {
     Config {
+        core: CoreConfig {
+            cache_capacity: 100,
+        },
         api: APIConfig {
             base_url: "https://api.besinveri.com".to_owned(),
             static_url: "https://besinveri.com/static".to_owned(),
             search_max_limit: 10,
-            health_internet_check_urls: vec!["https://www.google.com".to_owned(), "https://github.com".to_owned(), "https://www.wikipedia.org".to_owned()]
+            health_internet_check_urls: vec![
+                "https://www.google.com".to_owned(),
+                "https://github.com".to_owned(),
+                "https://www.wikipedia.org".to_owned(),
+            ],
         },
     }
 }

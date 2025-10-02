@@ -1,3 +1,6 @@
+[core]
+cache_capacity = 100
+
 [api]
 base_url = "https://api.besinveri.com"
 static_url = "https://besinveri.com/static"
