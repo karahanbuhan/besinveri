@@ -65,15 +65,15 @@ pub(crate) async fn handle_axum_rejections(
         status if status.is_client_error() => Err(APIError::new(
             status,
             &(format!(
-                "Client error: {}",
-                status.canonical_reason().unwrap_or("Undefined behaviour")
+                "İstemci hatası: {}",
+                status.canonical_reason().unwrap_or("Tanımsız davranış")
             )),
         )),
         status if status.is_server_error() => Err(APIError::new(
             status,
             &(format!(
-                "Server error: {}",
-                status.canonical_reason().unwrap_or("Undefined behaviour")
+                "Sunucu hatası: {}",
+                status.canonical_reason().unwrap_or("Tanımsız davranış")
             )),
         )),
         _ => Ok(response),
