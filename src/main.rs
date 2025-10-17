@@ -4,6 +4,7 @@ use anyhow::Error;
 use axum::{
     Router, ServiceExt,
     body::Body,
+    error_handling::HandleErrorLayer,
     extract::{Request, State},
     middleware::{self, Next},
     response::Response,
@@ -132,6 +133,12 @@ async fn main() -> Result<(), Error> {
         .route("/api/foods/list", get(api::foods::foods_list))
         .route("/api/foods/search", get(api::foods::foods_search))
         .with_state(shared_state.clone())
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(HandleErrorLayer::new(api::error::handle_rejections))
+                .timeout(std::time::Duration::from_secs(5)), // 5 saniyeden uzun sürerse timeout
+        )
+        .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
         .route_layer(middleware::from_fn_with_state(
             shared_state.clone(),
             |state, request, next| cache_middleware(state, request, next),

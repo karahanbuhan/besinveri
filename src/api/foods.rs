@@ -10,17 +10,21 @@ use anyhow::Result;
 use serde::Deserialize;
 use tracing::error;
 
-use crate::{SharedState, api::database, core::food::Food};
+use crate::{
+    SharedState,
+    api::{database, error::APIError},
+    core::food::Food,
+};
 
 pub(crate) async fn food(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
-) -> Result<Json<Food>, (StatusCode, &'static str)> {
+) -> Result<Json<Food>, APIError> {
     let mut food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
         .await
         .map_err(|e| {
             error!("Veritabanı yemek bilgisi sorgularken hata oluştu: {:?}", e);
-            (
+            APIError::new(
                 StatusCode::NOT_FOUND,
                 "Bu yemekle ilgili veriye ulaşılamadı",
             )
@@ -28,21 +32,19 @@ pub(crate) async fn food(
 
     fix_image_url(&State(shared_state), &mut food).await;
 
-    if food.verified.is_none_or(|verified| !verified) {
-        error!(
-            "Onaylanmamış yemeğe erişim yapılmaya çalışıldı {}",
-            food.slug.unwrap_or("".to_owned())
-        );
-        return Err((
-            StatusCode::NOT_FOUND,
+    if food.verified.is_some_and(|verified| verified) {
+        Ok(Json(food))
+    } else {
+        Err(APIError::new(
+            StatusCode::FORBIDDEN,
             "Bu yemek henüz onaylanmadığı için gösterilemiyor",
-        ));
+        ))
     }
-
-    Ok(Json(food))
 }
 
-pub(crate) async fn foods(State(shared_state): State<SharedState>) -> Json<BTreeMap<&'static str, String>> {
+pub(crate) async fn foods(
+    State(shared_state): State<SharedState>,
+) -> Json<BTreeMap<&'static str, String>> {
     // Henüz test etmedim ama ne olur ne olmaz diye to_owned atıyorum birkaç ms olsa bile config'e blok atılmaması için
     let api_base_url = &shared_state.config.lock().await.api.base_url.to_owned();
     let mut endpoints: BTreeMap<&'static str, String> = BTreeMap::new();
@@ -65,7 +67,7 @@ pub(crate) async fn foods(State(shared_state): State<SharedState>) -> Json<BTree
 // HashMap yerine BTreeMap kullanma sebebimiz, yemek isimlerini alfabetik sıralamak istememiz. HashMap kullansaydık her seferinde rastgele sıralama olacaktı
 pub(crate) async fn foods_list(
     State(shared_state): State<SharedState>,
-) -> Result<Json<BTreeMap<String, String>>, (StatusCode, &'static str)> {
+) -> Result<Json<BTreeMap<String, String>>, APIError> {
     let slugs = database::select_all_foods_slugs(&*shared_state.api_db.lock().await)
         .await
         .map_err(|e| {
@@ -73,7 +75,10 @@ pub(crate) async fn foods_list(
                 "Veritabanı yemek açıklamaları sorgularken hata oluştu: {:?}",
                 e
             );
-            (StatusCode::INTERNAL_SERVER_ERROR, "Veritabanı hatası")
+            APIError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Veritabanı sorgusu yapılırken hata oluştu",
+            )
         })?;
 
     let api_base_url = &shared_state.config.lock().await.api.base_url;
@@ -108,14 +113,10 @@ impl SearchParams {
 pub(crate) async fn foods_search(
     params: Query<SearchParams>,
     State(shared_state): State<SharedState>,
-) -> Result<Json<Vec<Food>>, (StatusCode, &'static str)> {
+) -> Result<Json<Vec<Food>>, APIError> {
     // Parametrelerin boyutunun 96 baytı geçmesini beklemiyoruz, DoS tarzı saldırıları önlemek için böyle bir önlem alıyoruz
     if params.size() > 96 {
-        error!(
-            "Parametre boyutu {} bayt! Limit 96 baytı geçiyor.",
-            params.size()
-        );
-        return Err((
+        return Err(APIError::new(
             StatusCode::BAD_REQUEST,
             "Gönderdiğiniz sorgu 96 bayt limitini aşıyor!",
         ));
@@ -131,18 +132,24 @@ pub(crate) async fn foods_search(
     // Bu limiti daha sonra ekleyeceğiz, sort yapmadan önce eklersek asıl göstermemiz gereken en alakalı yemekleri gösteremeyebiliriz
     let limit = params.limit.unwrap_or(5);
     if limit > shared_state.config.lock().await.api.search_max_limit {
-        error!("Arama limiti geçildi, limit={} çok yüksek!", limit);
-        return Err((StatusCode::BAD_REQUEST, "Arama limitini geçtiniz!"));
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Arama limitini geçtiniz!",
+        ));
     }
 
     let mut foods = match mode.as_str() {
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
             let db = &*shared_state.api_db.lock().await;
-            let mut foods = database::search_food_by_description_wild(db, &params.q).await.map_err(|e| {
-                            error!("Açıklama/isim ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, mode, limit, e);
-                            (StatusCode::NOT_FOUND, "İsim ile yemek ararken sonuç bulunamadı")
-            })?;
+            let mut foods = database::search_food_by_description_wild(db, &params.q)
+                .await
+                .map_err(|_| {
+                    APIError::new(
+                        StatusCode::NOT_FOUND,
+                        "İsim ile yemek ararken sonuç bulunamadı",
+                    )
+                })?;
 
             // Yemeklerin alakasına göre sıralıyoruz, örneğin query=Elm için 1. Elma, 2. Fuji Elma ... gibi
             sort_foods_by_query(&mut foods, &params.q).await;
@@ -152,15 +159,19 @@ pub(crate) async fn foods_search(
 
         "tag" => {
             let db = &*shared_state.api_db.lock().await;
-            let foods = database::search_food_by_tag_wild(db, &params.q).await.map_err(|e| {
-                    error!("Etiket ile yemek ararken bir hata oluştu, parametreler: query={}&limit={}&mode={}\nHata: {}", params.q, mode, limit, e);
-                    (StatusCode::NOT_FOUND, "Etiket ile yemek ararken sonuç bulunamadı")
+            let foods = database::search_food_by_tag_wild(db, &params.q)
+                .await
+                .map_err(|_| {
+                    APIError::new(
+                        StatusCode::NOT_FOUND,
+                        "Etiket ile yemek ararken sonuç bulunamadı",
+                    )
                 })?;
 
             Ok(foods)
         }
 
-        _ => Err((StatusCode::BAD_REQUEST, "Geçersiz sorgu!")),
+        _ => Err(APIError::new(StatusCode::BAD_REQUEST, "Geçersiz sorgu!")),
     }?;
 
     // Onaylanmamış yemekleri döndürmüyoruz
