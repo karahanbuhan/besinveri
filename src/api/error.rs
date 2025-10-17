@@ -1,6 +1,12 @@
 use std::fmt::{Display, Formatter};
 
-use axum::{body::Body, extract::Request, http::{self, header, HeaderMap, HeaderValue}, middleware::Next, response::IntoResponse};
+use axum::{
+    body::Body,
+    extract::Request,
+    http::{self, HeaderMap, HeaderValue, header::CONTENT_TYPE},
+    middleware::Next,
+    response::IntoResponse,
+};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -49,7 +55,7 @@ impl IntoResponse for APIError {
 
         // JSON için ve belki gelecekte başka değeler için header açalım
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
 
         (status, headers, body).into_response()
     }
@@ -69,7 +75,9 @@ pub(crate) async fn handle_axum_rejections(
     let response = next.run(request).await;
 
     // Eğer zaten APIError'ün oluşturduğu bir response ise, yani JSON formatındaysa direkt döndürebilriiz
-    if let Some(content_type) = response.headers().get(header::CONTENT_TYPE) && content_type == HeaderValue::from_static("application/json") {
+    if let Some(content_type) = response.headers().get(CONTENT_TYPE)
+        && content_type == HeaderValue::from_static("application/json")
+    {
         return Ok(response);
     }
 
