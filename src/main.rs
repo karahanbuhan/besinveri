@@ -65,7 +65,26 @@ async fn main() -> Result<(), Error> {
 
     let shared_state = SharedState::new().await?;
 
-    let router = Router::new().nest("/api", api_router(shared_state));
+    // http(s)://alanadi.com/API/NEST/PATH -> Bu şekilde girildiğinde /API/NEST/PATH'i kullanacağız nest için
+    // Scope içine açıyorum ownership sorununu düzeltmek için, ayrıca String kullanmamız gerekecek referans kullanamayız burada
+    let api_path: String = {
+        let config_guard = shared_state.config.lock().await;
+        config_guard
+            .api
+            .base_url
+            .replace("://", "") // Kesme işaretlerini istemiyoru başlangıçtaki
+            .split_once('/')
+            .map(|(_before, after)| format!("/{}", after))
+            .unwrap_or("/".to_owned())
+    };
+
+    // Nest'in içine boş path yazarsak Axum sorun çıkartıyor o yüzden böyle yapıyoruz
+    let router = if api_path == "/" {
+        api_router(shared_state)
+    } else {
+        Router::new().nest(&api_path, api_router(shared_state))
+    };
+
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
         NormalizePathLayer::trim_trailing_slash().layer(router),
