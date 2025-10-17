@@ -147,7 +147,7 @@ pub(crate) async fn foods_search(
                 .map_err(|_| {
                     APIError::new(
                         StatusCode::NOT_FOUND,
-                        "İsim ile yemek ararken sonuç bulunamadı",
+                        "Veritabanına yemek sorgusu atılırken bir hata oluştu",
                     )
                 })?;
 

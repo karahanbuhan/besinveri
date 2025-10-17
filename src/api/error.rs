@@ -19,6 +19,10 @@ impl APIError {
             message: message.to_owned(),
         }
     }
+
+    pub(crate) async fn not_found_handler() -> impl IntoResponse {
+        APIError::new(StatusCode::NOT_FOUND, "İstenen API endpoint'i bulunamadı")
+    }
 }
 
 impl IntoResponse for APIError {
@@ -57,47 +61,34 @@ impl Display for APIError {
     }
 }
 
-// Middleware için hata işleyicisi
+// Middleware için hata işleyicisi, axum'un çok detaylı hata döndürmesini istemiyoruz güvenlik açığına sebep olabileceği için.
 pub(crate) async fn handle_axum_rejections(
     request: Request<Body>,
     next: Next,
 ) -> Result<impl IntoResponse, APIError> {
     let response = next.run(request).await;
 
+    // Eğer zaten APIError'ün oluşturduğu bir response ise, yani JSON formatındaysa direkt döndürebilriiz
+    if let Some(content_type) = response.headers().get(header::CONTENT_TYPE) && content_type == HeaderValue::from_static("application/json") {
+        return Ok(response);
+    }
+
     // Deserializasyon hatalarını yakalamak için response status kontrolü
     match response.status() {
         status if status.is_client_error() => Err(APIError::new(
             status,
             &(format!(
-                "İstemci hatası: {}",
-                status.canonical_reason().unwrap_or("Tanımsız davranış")
+                "İstemci Hatası: {}",
+                status.canonical_reason().unwrap_or("Tanımsız Davranış")
             )),
         )),
         status if status.is_server_error() => Err(APIError::new(
             status,
             &(format!(
-                "Sunucu hatası: {}",
-                status.canonical_reason().unwrap_or("Tanımsız davranış")
+                "Sunucu Hatası: {}",
+                status.canonical_reason().unwrap_or("Tanımsız Davranış")
             )),
         )),
         _ => Ok(response),
-    }
-}
-
-// Axum'un kendi hatalarını APIError formatına getirmek için middleware
-pub(crate) async fn handle_rejections(err: axum::BoxError) -> impl IntoResponse {
-    if let Some(rejection) = err.downcast_ref::<axum::extract::rejection::QueryRejection>() {
-        let (status, message) = match rejection {
-            axum::extract::rejection::QueryRejection::FailedToDeserializeQueryString(e) => (
-                StatusCode::BAD_REQUEST,
-                format!("Sorgu ters serileştirilirken bir problem oluştu {}", e),
-            ),
-            _ => (StatusCode::BAD_REQUEST, "Geçeriz sorgu".to_string()),
-        };
-
-        APIError::new(status, &message).into_response()
-    } else {
-        // Diğer hatalar için varsayılan
-        APIError::new(StatusCode::INTERNAL_SERVER_ERROR, "Teknik bir hata oluştu").into_response()
     }
 }

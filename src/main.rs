@@ -125,29 +125,7 @@ async fn main() -> Result<(), Error> {
 
     let shared_state = SharedState::new().await?;
 
-    let router = Router::new()
-        .route("/api", get(api::endpoints::endpoints))
-        .route("/api/health", get(api::health::health))
-        .route("/api/food/{slug}", get(api::foods::food))
-        .route("/api/foods", get(api::foods::foods))
-        .route("/api/foods/list", get(api::foods::foods_list))
-        .route("/api/foods/search", get(api::foods::foods_search))
-        .with_state(shared_state.clone())
-        .layer(
-            tower::ServiceBuilder::new()
-                .layer(HandleErrorLayer::new(api::error::handle_rejections))
-                .timeout(std::time::Duration::from_secs(5)), // 5 saniyeden uzun sürerse timeout
-        )
-        .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
-        .route_layer(middleware::from_fn_with_state(
-            shared_state.clone(),
-            |state, request, next| cache_middleware(state, request, next),
-        ))
-        .layer(
-            tower::ServiceBuilder::new()
-                .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
-                .layer(GovernorLayer::default()), // Bu katman rate limiter için
-        );
+    let router = Router::new().nest("/api", api_router(shared_state));
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
         NormalizePathLayer::trim_trailing_slash().layer(router),
@@ -156,4 +134,26 @@ async fn main() -> Result<(), Error> {
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
 
     Ok(())
+}
+
+fn api_router(shared_state: SharedState) -> Router {
+    Router::new()
+        .route("/", get(api::endpoints::endpoints))
+        .route("/health", get(api::health::health))
+        .route("/food/{slug}", get(api::foods::food))
+        .route("/foods", get(api::foods::foods))
+        .route("/foods/list", get(api::foods::foods_list))
+        .route("/foods/search", get(api::foods::foods_search))
+        .with_state(shared_state.clone())
+        .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
+        .fallback(api::error::APIError::not_found_handler)
+        .route_layer(middleware::from_fn_with_state(
+            shared_state.clone(),
+            |state, request, next| cache_middleware(state, request, next),
+        ))
+        .layer(
+            tower::ServiceBuilder::new()
+                .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
+                .layer(GovernorLayer::default()), // Bu katman rate limiter için
+        )
 }
