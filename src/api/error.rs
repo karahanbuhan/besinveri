@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-use axum::{body::Body, extract::Request, http, middleware::Next, response::IntoResponse};
+use axum::{body::Body, extract::Request, http::{self, header, HeaderMap, HeaderValue}, middleware::Next, response::IntoResponse};
 use http::StatusCode;
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -43,7 +43,11 @@ impl IntoResponse for APIError {
             )
         });
 
-        (status, body).into_response()
+        // JSON için ve belki gelecekte başka değeler için header açalım
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));
+
+        (status, headers, body).into_response()
     }
 }
 
