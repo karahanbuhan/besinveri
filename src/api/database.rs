@@ -224,6 +224,16 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
     })
 }
 
+pub(crate) async fn select_all_tags(pool: &SqlitePool) -> Result<Vec<String>, Error> {
+    let mut tags: Vec<String> = Vec::new();
+
+    for row in sqlx::query("SELECT description FROM tags").fetch_all(pool).await? {
+        tags.push(row.try_get("description")?);
+    }
+
+    Ok(tags)
+}
+
 pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<String>, Error> {
     let mut slugs: Vec<String> = Vec::new();
 

@@ -22,6 +22,7 @@ pub(crate) async fn endpoints(State(shared_state): State<SharedState>) -> Json<B
             api_base_url, "foods/search?q={query}&mode={description, tag}&limit={limit}"
         ),
     );
+    endpoints.insert("show_all_tags", format!("{}/{}", api_base_url, "tags"));
 
     Json(endpoints)
 }

@@ -77,7 +77,7 @@ pub(crate) async fn foods_list(
             );
             APIError::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "Veritabanı sorgusu yapılırken hata oluştu",
+                "Veritabanı yemek sorgusu yapılırken hata oluştu",
             )
         })?;
 
@@ -91,6 +91,25 @@ pub(crate) async fn foods_list(
             .map(|slug| (slug.clone(), api_base_url.clone() + "/food/" + &slug))
             .collect(),
     ))
+}
+
+pub(crate) async fn tags_list(
+    State(shared_state): State<SharedState>,
+) -> Result<Json<Vec<String>>, APIError> {
+    let tags = database::select_all_tags(&*shared_state.api_db.lock().await)
+        .await
+        .map_err(|e| {
+            error!(
+                "Veritabanı etiket açıklamaları sorgularken hata oluştu: {:?}",
+                e
+            );
+            APIError::new(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Veritabanı etiket sorgusu yapılırken hata oluştu",
+            )
+        })?;
+
+    Ok(Json(tags))
 }
 
 #[derive(Deserialize)]

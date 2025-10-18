@@ -35,7 +35,11 @@ pub(crate) fn load_config_with_defaults() -> Result<Config, Error> {
     }
 
     let file: Vec<u8> = fs::read(path)?;
-    let config: Config = toml::from_slice(&file.as_slice())?;
+    let mut config: Config = toml::from_slice(&file.as_slice())?;
+
+    // Remove the trailing slashes in case there are
+    config.api.base_url = config.api.base_url.trim_end_matches("/").to_owned();
+    config.api.static_url = config.api.static_url.trim_end_matches("/").to_owned();
 
     Ok(config)
 }
