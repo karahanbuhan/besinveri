@@ -27,7 +27,7 @@ pub(crate) struct APIConfig {
 }
 
 pub(crate) fn load_config_with_defaults() -> Result<Config, Error> {
-    let path = "config.yml";
+    let path = "config.toml";
 
     if !fs::exists(path)? {
         create_default_config_file(path)?;

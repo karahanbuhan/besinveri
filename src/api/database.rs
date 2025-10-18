@@ -227,7 +227,10 @@ async fn insert_food(pool: &SqlitePool, food: Food) -> Result<Food, Error> {
 pub(crate) async fn select_all_tags(pool: &SqlitePool) -> Result<Vec<String>, Error> {
     let mut tags: Vec<String> = Vec::new();
 
-    for row in sqlx::query("SELECT description FROM tags").fetch_all(pool).await? {
+    for row in sqlx::query("SELECT description FROM tags")
+        .fetch_all(pool)
+        .await?
+    {
         tags.push(row.try_get("description")?);
     }
 
@@ -245,24 +248,6 @@ pub(crate) async fn select_all_foods_slugs(pool: &SqlitePool) -> Result<Vec<Stri
     }
 
     Ok(slugs)
-}
-
-async fn select_allergen_description_by_id(
-    pool: &SqlitePool,
-    allergen_id: i64,
-) -> Result<String, Error> {
-    select_description_by_id(pool, "allergens", allergen_id).await
-}
-
-async fn select_serving_description_by_id(
-    pool: &SqlitePool,
-    serving_description_id: i64,
-) -> Result<String, Error> {
-    select_description_by_id(pool, "serving_descriptions", serving_description_id).await
-}
-
-async fn select_tag_description_by_id(pool: &SqlitePool, tag_id: i64) -> Result<String, Error> {
-    select_description_by_id(pool, "tags", tag_id).await
 }
 
 async fn select_image_url_by_id(pool: &SqlitePool, image_id: i64) -> Result<String, Error> {
@@ -307,14 +292,12 @@ async fn select_food_allergens_by_food_id(
 ) -> Result<Vec<String>, Error> {
     let mut allergens: Vec<String> = Vec::new();
 
-    for row in sqlx::query("SELECT allergen_id FROM food_allergens WHERE (food_id = ?)")
+    for row in sqlx::query("SELECT A.description FROM allergens A INNER JOIN food_allergens FA ON A.id = FA.allergen_id WHERE FA.food_id = ?")
         .bind(food_id)
         .fetch_all(pool)
         .await?
     {
-        let description =
-            select_allergen_description_by_id(pool, row.try_get("allergen_id")?).await?;
-        allergens.push(description);
+        allergens.push(row.try_get("description")?);
     }
 
     Ok(allergens)
@@ -326,13 +309,12 @@ async fn select_food_tags_by_food_id(
 ) -> Result<Vec<String>, Error> {
     let mut tags: Vec<String> = Vec::new();
 
-    for row in sqlx::query("SELECT tag_id FROM food_tags WHERE (food_id = ?)")
+    for row in sqlx::query("SELECT T.description FROM tags T INNER JOIN food_tags FT ON T.id = FT.tag_id WHERE FT.food_id = ?")
         .bind(food_id)
         .fetch_all(pool)
         .await?
     {
-        let description = select_tag_description_by_id(pool, row.try_get("tag_id")?).await?;
-        tags.push(description);
+        tags.push(row.try_get("description")?);
     }
 
     Ok(tags)
@@ -345,14 +327,12 @@ async fn select_food_servings_by_food_id(
     let mut servings: BTreeMap<String, f64> = BTreeMap::new();
 
     for row in
-        sqlx::query("SELECT serving_description_id, weight FROM food_servings WHERE (food_id = ?)")
+        sqlx::query("SELECT SD.description, FS.weight FROM serving_descriptions SD INNER JOIN food_servings FS ON SD.id = FS.serving_description_id WHERE FS.food_id = ?")
             .bind(food_id)
             .fetch_all(pool)
             .await?
     {
-        let description =
-            select_serving_description_by_id(pool, row.try_get("serving_description_id")?).await?;
-        servings.insert(description, row.try_get("weight")?);
+        servings.insert(row.try_get("description")?, row.try_get("weight")?);
     }
 
     Ok(servings)
@@ -366,7 +346,16 @@ async fn select_food_where<'a, T>(
 where
     T: for<'b> Encode<'b, Sqlite> + Type<Sqlite> + Send + 'a,
 {
-    let query_str = format!("SELECT * FROM foods WHERE {}", condition);
+    let query_str = format!(
+        "SELECT 
+            F.*, 
+            FI.image_url, 
+            FS.description AS source_description 
+        FROM foods F
+        LEFT JOIN food_images FI ON F.image_id = FI.id 
+        LEFT JOIN food_sources FS ON F.source_id = FS.id 
+            WHERE {}", condition
+    );
     let row = sqlx::query(&query_str)
         .bind(binding)
         .fetch_one(pool)
