@@ -20,6 +20,23 @@ pub(crate) async fn food(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, APIError> {
+    // Validate slug to prevent path traversal and injection attacks
+    if slug.is_empty() || slug.len() > 100 {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Geçersiz yemek slug'ı",
+        ));
+    }
+
+    // Check for suspicious characters in slug
+    if slug.contains("..") || slug.contains('/') || slug.contains('\\') || 
+       slug.contains('\0') || slug.contains(';') {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Slug geçersiz karakterler içeriyor",
+        ));
+    }
+
     let mut food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
         .await
         .map_err(|e| {
@@ -127,12 +144,56 @@ impl SearchParams {
         // SearchParams'ın statik boyutunu da ekliyoruz
         size_of::<SearchParams>() + query_size + mode_size
     }
+
+    /// Validates and sanitizes the search query to prevent injection attacks
+    fn validate(&self) -> Result<(), &'static str> {
+        // Check for empty query
+        if self.q.trim().is_empty() {
+            return Err("Sorgu boş olamaz");
+        }
+
+        // Check for suspicious patterns that might indicate injection attempts
+        let suspicious_patterns = ["--", "/*", "*/", "\\"];
+        let suspicious_chars = ['\'', '"', ';', '\\', '\0'];
+        
+        if self.q.chars().any(|c| suspicious_chars.contains(&c)) {
+            return Err("Sorgu geçersiz karakterler içeriyor");
+        }
+        
+        for pattern in suspicious_patterns {
+            if self.q.contains(pattern) {
+                return Err("Sorgu geçersiz karakterler içeriyor");
+            }
+        }
+
+        // Validate mode if provided
+        if let Some(mode) = &self.mode {
+            let valid_modes = ["description", "name", "tag"];
+            if !valid_modes.contains(&mode.to_lowercase().as_str()) {
+                return Err("Geçersiz arama modu");
+            }
+        }
+
+        // Validate limit if provided
+        if let Some(limit) = self.limit {
+            if limit == 0 || limit > 100 {
+                return Err("Geçersiz limit değeri");
+            }
+        }
+
+        Ok(())
+    }
 }
 
 pub(crate) async fn foods_search(
     params: Query<SearchParams>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Vec<Food>>, APIError> {
+    // Validate input parameters to prevent injection attacks
+    if let Err(err_msg) = params.validate() {
+        return Err(APIError::new(StatusCode::BAD_REQUEST, err_msg));
+    }
+
     // Parametrelerin boyutunun 96 baytı geçmesini beklemiyoruz, DoS tarzı saldırıları önlemek için böyle bir önlem alıyoruz
     if params.size() > 96 {
         return Err(APIError::new(
@@ -679,5 +740,94 @@ mod tests {
 
         // Aynı skorlu elementler orijinal sıralarını korumalı
         assert_eq!(foods, original_order);
+    }
+
+    // Security tests for input validation
+    #[test]
+    fn test_search_params_validation_rejects_sql_injection() {
+        let params = SearchParams {
+            q: "test'; DROP TABLE foods; --".to_string(),
+            mode: None,
+            limit: None,
+        };
+        assert!(params.validate().is_err(), "SQL injection attempt should be rejected");
+
+        let params2 = SearchParams {
+            q: "test\" OR 1=1--".to_string(),
+            mode: None,
+            limit: None,
+        };
+        assert!(params2.validate().is_err(), "SQL injection attempt should be rejected");
+    }
+
+    #[test]
+    fn test_search_params_validation_rejects_empty_query() {
+        let params = SearchParams {
+            q: "   ".to_string(),
+            mode: None,
+            limit: None,
+        };
+        assert!(params.validate().is_err(), "Empty query should be rejected");
+    }
+
+    #[test]
+    fn test_search_params_validation_rejects_invalid_mode() {
+        let params = SearchParams {
+            q: "valid query".to_string(),
+            mode: Some("invalid_mode".to_string()),
+            limit: None,
+        };
+        assert!(params.validate().is_err(), "Invalid mode should be rejected");
+    }
+
+    #[test]
+    fn test_search_params_validation_rejects_invalid_limit() {
+        let params = SearchParams {
+            q: "valid query".to_string(),
+            mode: None,
+            limit: Some(0),
+        };
+        assert!(params.validate().is_err(), "Limit of 0 should be rejected");
+
+        let params2 = SearchParams {
+            q: "valid query".to_string(),
+            mode: None,
+            limit: Some(1000),
+        };
+        assert!(params2.validate().is_err(), "Excessive limit should be rejected");
+    }
+
+    #[test]
+    fn test_search_params_validation_accepts_valid_input() {
+        let params = SearchParams {
+            q: "elma".to_string(),
+            mode: Some("description".to_string()),
+            limit: Some(10),
+        };
+        assert!(params.validate().is_ok(), "Valid input should be accepted");
+
+        let params2 = SearchParams {
+            q: "test query".to_string(),
+            mode: Some("tag".to_string()),
+            limit: Some(5),
+        };
+        assert!(params2.validate().is_ok(), "Valid input should be accepted");
+    }
+
+    #[test]
+    fn test_search_params_validation_rejects_comment_injection() {
+        let params = SearchParams {
+            q: "test /* comment */".to_string(),
+            mode: None,
+            limit: None,
+        };
+        assert!(params.validate().is_err(), "Comment injection should be rejected");
+
+        let params2 = SearchParams {
+            q: "test -- comment".to_string(),
+            mode: None,
+            limit: None,
+        };
+        assert!(params2.validate().is_err(), "Comment injection should be rejected");
     }
 }

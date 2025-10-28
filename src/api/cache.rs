@@ -41,7 +41,8 @@ pub async fn cache_middleware(
         return Ok(response);
     }
 
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+    // Limit body size to 10MB to prevent DoS attacks
+    let body = axum::body::to_bytes(response.into_body(), 10 * 1024 * 1024)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let body = std::str::from_utf8(&body)

@@ -14,7 +14,10 @@ use real::RealIpLayer;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
-use tower_http::normalize_path::NormalizePathLayer;
+use tower_http::{
+    normalize_path::NormalizePathLayer,
+    cors::{CorsLayer, Any},
+};
 
 use crate::core::config::Config;
 
@@ -96,6 +99,13 @@ async fn main() -> Result<(), Error> {
 }
 
 fn api_router(shared_state: SharedState) -> Router {
+    // Configure CORS with restrictive settings for security
+    let cors = CorsLayer::new()
+        .allow_origin(Any) // Allow any origin for public API, but consider restricting in production
+        .allow_methods([axum::http::Method::GET]) // Only allow GET requests
+        .allow_headers([axum::http::header::CONTENT_TYPE])
+        .max_age(std::time::Duration::from_secs(3600));
+
     Router::new()
         .route("/", get(api::endpoints::endpoints))
         .route("/health", get(api::health::health))
@@ -111,6 +121,8 @@ fn api_router(shared_state: SharedState) -> Router {
             shared_state.clone(),
             |state, request, next| api::cache::cache_middleware(state, request, next),
         ))
+        .layer(middleware::from_fn(api::security::security_headers_middleware)) // Security headers for all responses
+        .layer(cors) // CORS configuration
         .layer(
             tower::ServiceBuilder::new()
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
