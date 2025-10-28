@@ -4,12 +4,12 @@ import time
 from datetime import datetime
 
 # 150 farklı sorgu, 28 karakter (96 bayt altında)
-BASE_URL = "http://localhost:8099/api/foods/search"
+BASE_URL = "http://localhost:8099/foods/search"
 QUERIES = [f"q={'A' * 28}_{i:03d}" for i in range(150)]  # q=AAA..._000, q=AAA..._001, ...
 URLS = [f"{BASE_URL}?{query}" for query in QUERIES]
 
-# Rate limit: Saniyede 4 istek
-RATE_LIMIT = 4
+# Rate limit: Saniyede 7 istek
+RATE_LIMIT = 7
 COOLDOWN = 1.0  # 1 saniye cooldown
 
 async def send_get_request(url: str, client: httpx.AsyncClient, semaphore: asyncio.Semaphore) -> dict:
