@@ -2,7 +2,6 @@ use std::collections::{BTreeMap};
 
 use serde::{Deserialize, Serialize};
 use sqlx::{Error, FromRow, Row, sqlite::SqliteRow};
-use tracing::info;
 
 #[derive(Debug, Deserialize, Serialize, Clone, Default, PartialEq)]
 pub(crate) struct Food {

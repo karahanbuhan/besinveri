@@ -1,8 +1,8 @@
-use std::{collections::BTreeMap, fs};
+use std::fs;
 
 use crate::core::{food::Food, str::to_lower_en_kebab_case};
 use anyhow::{Context, Error, anyhow};
-use sqlx::{Encode, Pool, Row, Sqlite, SqlitePool, Type, sqlite::SqliteRow};
+use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use tracing::{info, warn};
 
 fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
@@ -346,7 +346,6 @@ pub(crate) async fn search_foods_by_tag_wild(
     .fetch_all(pool)
     .await?)
 }
-
 
 #[cfg(test)]
 mod tests {
