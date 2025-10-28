@@ -354,7 +354,8 @@ where
         FROM foods F
         LEFT JOIN food_images FI ON F.image_id = FI.id 
         LEFT JOIN food_sources FS ON F.source_id = FS.id 
-            WHERE {}", condition
+            WHERE {}",
+        condition
     );
     let row = sqlx::query(&query_str)
         .bind(binding)
@@ -430,30 +431,25 @@ pub(crate) async fn search_food_by_tag_wild(
     pool: &SqlitePool,
     tag: &str,
 ) -> Result<Vec<Food>, Error> {
-    // Tag seçmeliyiz önce description'a like atarak tags'de
-    let tags_row = sqlx::query(&format!("SELECT * FROM tags WHERE description LIKE ?",))
-        .bind(format!("%{}%", tag))
-        .fetch_all(pool)
-        .await?;
-    let mut tags: Vec<(i64, String)> = Vec::new();
-    for tag_row in tags_row {
-        tags.push((tag_row.try_get("id")?, tag_row.try_get("description")?));
-    }
-
-    // Sonrasında dönen tag_id'leri food_tags'te aratıp yemekleri döndürmeliyiz
     let mut foods: Vec<Food> = Vec::new();
-    for (tag_id, _) in tags {
-        let food_ids = sqlx::query(&format!("SELECT food_id FROM food_tags WHERE tag_id = ?",))
-            .bind(tag_id)
-            .fetch_all(pool)
-            .await?;
-
-        for food_id in food_ids {
-            let food_id: i64 = food_id.try_get("food_id")?;
-            foods.push(select_food_where(pool, "id = ?".to_owned(), food_id).await?);
-        }
+    for row in sqlx::query(
+        "SELECT
+            F.*,
+            FI.image_url,
+            FS.description AS source_description
+            FROM foods F
+            INNER JOIN food_tags FT ON F.id = FT.food_id
+            INNER JOIN tags T ON FT.tag_id = T.id
+            LEFT JOIN food_images FI ON F.image_id = FI.id
+            LEFT JOIN food_sources FS ON F.source_id = FS.id
+            WHERE T.description LIKE ?)",
+    )
+    .bind(format!("%{}%", tag))
+    .fetch_all(pool)
+    .await?
+    {
+        foods.push(food_from_row(pool, row).await?)
     }
-
     Ok(foods)
 }
 
@@ -461,7 +457,7 @@ pub(crate) async fn search_food_by_description_wild(
     pool: &SqlitePool,
     description: &str,
 ) -> Result<Vec<Food>, Error> {
-    // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elmalı Börek gibi sonuçlar da çıksın
+    // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elma Turtası gibi sonuçlar da çıksın
     select_foods_where(
         pool,
         &format!("description LIKE ?"),
