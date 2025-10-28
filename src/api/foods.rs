@@ -161,7 +161,7 @@ pub(crate) async fn foods_search(
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
             let db = &*shared_state.api_db.lock().await;
-            let mut foods = database::search_food_by_description_wild(db, &params.q)
+            let mut foods = database::search_foods_by_description_wild(db, &params.q)
                 .await
                 .map_err(|_| {
                     APIError::new(
@@ -178,7 +178,7 @@ pub(crate) async fn foods_search(
 
         "tag" => {
             let db = &*shared_state.api_db.lock().await;
-            let foods = database::search_food_by_tag_wild(db, &params.q)
+            let foods = database::search_foods_by_tag_wild(db, &params.q)
                 .await
                 .map_err(|_| {
                     APIError::new(
