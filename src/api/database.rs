@@ -276,70 +276,17 @@ pub(crate) async fn select_all_tags(pool: &SqlitePool) -> Result<Vec<String>, Er
     Ok(tags)
 }
 
-async fn select_food_allergens_by_food_id(
-    pool: &SqlitePool,
-    food_id: i64,
-) -> Result<Vec<String>, Error> {
-    let mut allergens: Vec<String> = Vec::new();
-
-    for row in sqlx::query("SELECT A.description FROM allergens A INNER JOIN food_allergens FA ON A.id = FA.allergen_id WHERE FA.food_id = ?")
-        .bind(food_id)
-        .fetch_all(pool)
-        .await?
-    {
-        allergens.push(row.try_get("description")?);
-    }
-
-    Ok(allergens)
-}
-
-async fn select_food_tags_by_food_id(
-    pool: &SqlitePool,
-    food_id: i64,
-) -> Result<Vec<String>, Error> {
-    let mut tags: Vec<String> = Vec::new();
-
-    for row in sqlx::query("SELECT T.description FROM tags T INNER JOIN food_tags FT ON T.id = FT.tag_id WHERE FT.food_id = ?")
-        .bind(food_id)
-        .fetch_all(pool)
-        .await?
-    {
-        tags.push(row.try_get("description")?);
-    }
-
-    Ok(tags)
-}
-
-async fn select_food_servings_by_food_id(
-    pool: &SqlitePool,
-    food_id: i64,
-) -> Result<BTreeMap<String, f64>, Error> {
-    let mut servings: BTreeMap<String, f64> = BTreeMap::new();
-
-    for row in
-        sqlx::query("SELECT SD.description, FS.weight FROM serving_descriptions SD INNER JOIN food_servings FS ON SD.id = FS.serving_description_id WHERE FS.food_id = ?")
-            .bind(food_id)
-            .fetch_all(pool)
-            .await?
-    {
-        servings.insert(row.try_get("description")?, row.try_get("weight")?);
-    }
-
-    Ok(servings)
-}
-
-async fn food_from_row(pool: &SqlitePool, row: SqliteRow) -> Result<Food, Error> {
-    let id: i64 = row.try_get("id")?;
+async fn food_from_row(row: SqliteRow) -> Result<Food, Error> {
     Ok(Food {
-        id: Some(id),
+        id: Some(row.try_get("id")?),
         slug: row.try_get("slug")?,
         description: row.try_get("description")?,
         verified: Some(row.try_get::<i64, _>("verified")? != 0),
         image_url: row.try_get("image_url")?,
         source: row.try_get("source_description")?,
-        tags: select_food_tags_by_food_id(pool, id).await?,
-        allergens: select_food_allergens_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
-        servings: select_food_servings_by_food_id(pool, row.try_get::<i64, _>("id")?).await?,
+        tags: serde_json::from_str(row.try_get("tags")?)?,
+        allergens: serde_json::from_str(row.try_get("allergens")?)?,
+        servings: serde_json::from_str(row.try_get("servings")?)?,
         glycemic_index: row.try_get("glycemic_index")?,
         energy: row.try_get("energy")?,
         carbohydrate: row.try_get("carbohydrate")?,
@@ -369,24 +316,43 @@ async fn food_from_row(pool: &SqlitePool, row: SqliteRow) -> Result<Food, Error>
 
 pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Result<Food, Error> {
     let row = sqlx::query(
-        "
+        r#"
         SELECT 
             F.*,
             FI.image_url, 
-            FS.description as source_description
+            FS.description as source_description,
+
+            -- Etiketleri de JSON yapıyoruz, birden fazla SQL sorgusu atmak istemiyoruz network roundtrip olmaması için
+            (SELECT json_group_array(T.description)
+             FROM tags T
+             INNER JOIN food_tags FT ON T.id = FT.tag_id
+             WHERE FT.food_id = F.id) as "tags",
+
+            -- Alerjenleri bir JSON dizisi yapalım
+            (SELECT json_group_array(A.description)
+             FROM allergens A
+             INNER JOIN food_allergens FA ON A.id = FA.allergen_id
+             WHERE FA.food_id = F.id) as "allergens",
+            
+            -- Porsiyonları bulup bir JSON nesnesi yapıyoruz { "description": weight }
+            (SELECT json_group_object(SD.description, FS.weight)
+             FROM serving_descriptions SD
+             INNER JOIN food_servings FS ON SD.id = FS.serving_description_id
+             WHERE FS.food_id = F.id) as "servings"
+
         FROM foods F
         
         LEFT JOIN food_images FI ON FI.id = F.image_id
         LEFT JOIN food_sources FS ON FS.id = F.source_id
 
         WHERE F.slug = ?
-    ",
+    "#,
     )
     .bind(slug)
     .fetch_one(pool)
     .await?;
 
-    Ok(food_from_row(pool, row).await?)
+    Ok(food_from_row(row).await?)
 }
 
 pub(crate) async fn search_foods_by_description_wild(
@@ -401,7 +367,7 @@ pub(crate) async fn search_foods_by_description_wild(
 
     let mut foods: Vec<Food> = Vec::new();
     for row in rows {
-        foods.push(food_from_row(pool, row).await?)
+        foods.push(food_from_row(row).await?)
     }
 
     Ok(foods)
