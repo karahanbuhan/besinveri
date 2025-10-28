@@ -88,30 +88,36 @@ def test_security_headers():
     
     return True
 
+def check_cors_header(response):
+    """Helper function to check if CORS header is present in response"""
+    return "access-control-allow-origin" in response.headers
+
 def test_cors_headers():
     """Test that CORS headers are configured"""
     print("Testing CORS headers...")
     
+    # Try OPTIONS request first
     response = requests.options(
         "http://localhost:8099/health",
         headers={"Origin": "http://example.com"}
     )
     
-    if "access-control-allow-origin" in response.headers:
+    if check_cors_header(response):
         print(f"  ✓ CORS configured: {response.headers['access-control-allow-origin']}")
         return True
-    else:
-        # CORS might only be on GET requests
-        response = requests.get(
-            "http://localhost:8099/health",
-            headers={"Origin": "http://example.com"}
-        )
-        if "access-control-allow-origin" in response.headers:
-            print(f"  ✓ CORS configured: {response.headers['access-control-allow-origin']}")
-            return True
-        else:
-            print("  ✗ CORS headers not found")
-            return False
+    
+    # CORS might only be on GET requests
+    response = requests.get(
+        "http://localhost:8099/health",
+        headers={"Origin": "http://example.com"}
+    )
+    
+    if check_cors_header(response):
+        print(f"  ✓ CORS configured: {response.headers['access-control-allow-origin']}")
+        return True
+    
+    print("  ✗ CORS headers not found")
+    return False
 
 def test_input_validation():
     """Test various input validation scenarios"""
@@ -197,6 +203,7 @@ def main():
     
     passed = 0
     failed = 0
+    connection_error = False
     
     for test in tests:
         try:
@@ -207,14 +214,19 @@ def main():
                 failed += 1
                 print(f"✗ {test.__name__} failed\n")
         except requests.exceptions.ConnectionError:
-            print(f"✗ Cannot connect to API server. Is it running on localhost:8099?")
-            sys.exit(1)
+            if not connection_error:
+                print(f"✗ Cannot connect to API server. Is it running on localhost:8099?")
+                connection_error = True
+            failed += 1
+            print(f"✗ {test.__name__} skipped due to connection error\n")
         except Exception as e:
             failed += 1
             print(f"✗ {test.__name__} failed with exception: {e}\n")
     
     print("=" * 60)
     print(f"Results: {passed} passed, {failed} failed")
+    if connection_error:
+        print("Warning: Some tests were skipped due to connection errors")
     print("=" * 60)
     
     if failed > 0:
