@@ -20,6 +20,24 @@ pub(crate) async fn food(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, APIError> {
+    // Girilen yemek isminin, istediğimiz limitler içinde olduğuna emin olalım, DoS'a karşı karakter limiti ekleyelim.
+    if slug.is_empty() || slug.len() > 100 {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Geçersiz yemek slug'ı",
+        ));
+    }
+
+    // Normal bir yemek isminde olmaması gereken karakterler var mı diye de bakalım.
+    // Bu karakterler kullanılsa dahi sorun olmaması lazım, yine de önlemimizi alalım.
+    if slug.contains("..") || slug.contains('/') || slug.contains('\\') || 
+       slug.contains('\0') || slug.contains(';') || slug.contains("--") {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Slug geçersiz karakterler içeriyor",
+        ));
+    }
+
     let mut food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
         .await
         .map_err(|e| {
