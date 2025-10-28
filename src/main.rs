@@ -105,7 +105,6 @@ fn api_router(shared_state: SharedState) -> Router {
         .route("/foods/search", get(api::foods::foods_search))
         .route("/tags", get(api::foods::tags_list))
         .with_state(shared_state.clone())
-        .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
         .fallback(api::error::APIError::not_found_handler)
         .route_layer(middleware::from_fn_with_state(
             shared_state.clone(),
@@ -116,4 +115,5 @@ fn api_router(shared_state: SharedState) -> Router {
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
                 .layer(GovernorLayer::default()), // Bu katman rate limiter için
         )
+        .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
 }
