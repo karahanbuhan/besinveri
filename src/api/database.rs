@@ -276,47 +276,7 @@ pub(crate) async fn select_all_tags(pool: &SqlitePool) -> Result<Vec<String>, Er
     Ok(tags)
 }
 
-async fn food_from_row(row: SqliteRow) -> Result<Food, Error> {
-    Ok(Food {
-        id: Some(row.try_get("id")?),
-        slug: row.try_get("slug")?,
-        description: row.try_get("description")?,
-        verified: Some(row.try_get::<i64, _>("verified")? != 0),
-        image_url: row.try_get("image_url")?,
-        source: row.try_get("source_description")?,
-        tags: serde_json::from_str(row.try_get("tags")?)?,
-        allergens: serde_json::from_str(row.try_get("allergens")?)?,
-        servings: serde_json::from_str(row.try_get("servings")?)?,
-        glycemic_index: row.try_get("glycemic_index")?,
-        energy: row.try_get("energy")?,
-        carbohydrate: row.try_get("carbohydrate")?,
-        protein: row.try_get("protein")?,
-        fat: row.try_get("fat")?,
-        saturated_fat: row.try_get("saturated_fat")?,
-        trans_fat: row.try_get("trans_fat")?,
-        sugar: row.try_get("sugar")?,
-        fiber: row.try_get("fiber")?,
-        water: row.try_get("water")?,
-        cholesterol: row.try_get("cholesterol")?,
-        sodium: row.try_get("sodium")?,
-        potassium: row.try_get("potassium")?,
-        iron: row.try_get("iron")?,
-        magnesium: row.try_get("magnesium")?,
-        calcium: row.try_get("calcium")?,
-        zinc: row.try_get("zinc")?,
-        vitamin_a: row.try_get("vitamin_a")?,
-        vitamin_b6: row.try_get("vitamin_b6")?,
-        vitamin_b12: row.try_get("vitamin_b12")?,
-        vitamin_c: row.try_get("vitamin_c")?,
-        vitamin_d: row.try_get("vitamin_d")?,
-        vitamin_e: row.try_get("vitamin_e")?,
-        vitamin_k: row.try_get("vitamin_k")?,
-    })
-}
-
-pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Result<Food, Error> {
-    let row = sqlx::query(
-        r#"
+const SELECT_FOOD_SQL_QUERY: &str = r#"
         SELECT 
             F.*,
             FI.image_url, 
@@ -344,33 +304,28 @@ pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Resu
         
         LEFT JOIN food_images FI ON FI.id = F.image_id
         LEFT JOIN food_sources FS ON FS.id = F.source_id
+        "#;
 
-        WHERE F.slug = ?
-    "#,
+pub(crate) async fn select_food_by_slug(pool: &SqlitePool, slug: String) -> Result<Food, Error> {
+    Ok(
+        sqlx::query_as(&format!("{} WHERE F.slug = ?", SELECT_FOOD_SQL_QUERY))
+            .bind(slug)
+            .fetch_one(pool)
+            .await?,
     )
-    .bind(slug)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(food_from_row(row).await?)
 }
 
 pub(crate) async fn search_foods_by_description_wild(
     pool: &SqlitePool,
     description: &str,
 ) -> Result<Vec<Food>, Error> {
-    // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elma Turtası gibi sonuçlar da çıksın
-    let rows = sqlx::query("SELECT * FROM foods WHERE description LIKE ?")
-        .bind(&format!("%{}%", description))
-        .fetch_all(pool)
-        .await?;
-
-    let mut foods: Vec<Food> = Vec::new();
-    for row in rows {
-        foods.push(food_from_row(row).await?)
-    }
-
-    Ok(foods)
+    Ok(
+        sqlx::query_as(&format!("{} WHERE F.description LIKE ?", SELECT_FOOD_SQL_QUERY))
+            // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elma Turtası gibi sonuçlar da çıksın
+            .bind(&format!("%{}%", description))
+            .fetch_all(pool)
+            .await?,
+    )
 }
 
 pub(crate) async fn search_foods_by_tag_wild(
