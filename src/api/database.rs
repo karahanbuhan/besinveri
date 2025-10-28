@@ -365,23 +365,6 @@ where
     Ok(food_from_row(pool, row).await?)
 }
 
-async fn select_foods_where(
-    pool: &SqlitePool,
-    condition: &str,
-    binding: &str,
-) -> Result<Vec<Food>, Error> {
-    let rows = sqlx::query(&format!("SELECT * FROM foods WHERE {}", condition))
-        .bind(binding)
-        .fetch_all(pool)
-        .await?;
-
-    let mut foods: Vec<Food> = Vec::new();
-    for row in rows {
-        foods.push(food_from_row(pool, row).await?)
-    }
-    Ok(foods)
-}
-
 async fn food_from_row(pool: &SqlitePool, row: SqliteRow) -> Result<Food, Error> {
     let id: i64 = row.try_get("id")?;
     let image_id: i64 = row.try_get("image_id")?;
@@ -458,12 +441,17 @@ pub(crate) async fn search_food_by_description_wild(
     description: &str,
 ) -> Result<Vec<Food>, Error> {
     // %Elma% şeklinde aratıyoruz ki Fuji Elma, Elma Turtası gibi sonuçlar da çıksın
-    select_foods_where(
-        pool,
-        &format!("description LIKE ?"),
-        &format!("%{}%", description),
-    )
-    .await
+    let rows = sqlx::query("SELECT * FROM foods WHERE description LIKE ?")
+        .bind(&format!("%{}%", description))
+        .fetch_all(pool)
+        .await?;
+
+    let mut foods: Vec<Food> = Vec::new();
+    for row in rows {
+        foods.push(food_from_row(pool, row).await?)
+    }
+
+    Ok(foods)
 }
 
 fn load_foods_from_jsons(dir: &str) -> Result<Vec<Food>, Error> {
