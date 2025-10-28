@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Build artifacts
+target/
+Cargo.lock
+
+# Documentation
+*.md
+!README.md
+
+# Scripts
+scripts/
+
+# Environment
+.env
+.env.*
+
+# Testing
+tests/
+*.test
+
+# CI/CD
+.github/
