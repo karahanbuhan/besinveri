@@ -24,7 +24,7 @@ pub(crate) async fn food(
     if slug.is_empty() || slug.len() > 100 {
         return Err(APIError::new(
             StatusCode::BAD_REQUEST,
-            "Geçersiz yemek slug'ı",
+            "Slug en az 1 karakter, en fazla 100 karakterden oluşabilir",
         ));
     }
 

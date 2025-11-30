@@ -14,7 +14,7 @@ use real::RealIpLayer;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
-use tower_http::normalize_path::NormalizePathLayer;
+use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer};
 
 use crate::core::config::Config;
 
@@ -85,9 +85,15 @@ async fn main() -> Result<(), Error> {
         Router::new().nest(&api_path, api_router(shared_state))
     };
 
+    // Web Uygulamalarda tarayıcıların sorun çıkartmaması için CORS header mekanizmasını da ekliyoruz
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods(tower_http::cors::Any)
+        .allow_headers(tower_http::cors::Any);
+
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
-        NormalizePathLayer::trim_trailing_slash().layer(router),
+        NormalizePathLayer::trim_trailing_slash().layer(router.layer(cors)),
     );
 
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
