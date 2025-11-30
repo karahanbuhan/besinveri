@@ -89,8 +89,9 @@ async fn main() -> Result<(), Error> {
     // Web Uygulamalarda tarayıcıların sorun çıkartmaması için CORS header mekanizmasını da ekliyoruz
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
-        .allow_methods([Method::GET, Method::POST])
-        .allow_headers(tower_http::cors::Any);
+        .allow_methods([Method::GET])
+        .allow_headers(tower_http::cors::Any)
+        .max_age(std::time::Duration::from_secs(3600));
 
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
