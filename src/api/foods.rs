@@ -32,7 +32,8 @@ pub(crate) async fn food(
     // Bu karakterler kullanılsa dahi sorun olmaması lazım, yine de önlemimizi alalım.
     if slug.contains("..") || slug.contains('/') || slug.contains('\\') || 
        slug.contains('\0') || slug.contains(';') || slug.contains("--") ||
-       slug.contains("/*") || slug.contains("*/") {
+       slug.contains("/*") || slug.contains("*/") || slug.contains("'") ||
+       slug.contains("\"") || slug.contains("\\") {
         return Err(APIError::new(
             StatusCode::BAD_REQUEST,
             "Slug geçersiz karakterler içeriyor",
