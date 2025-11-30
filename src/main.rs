@@ -11,6 +11,7 @@ use axum_governor::GovernorLayer;
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
+use reqwest::Method;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
@@ -88,7 +89,7 @@ async fn main() -> Result<(), Error> {
     // Web Uygulamalarda tarayıcıların sorun çıkartmaması için CORS header mekanizmasını da ekliyoruz
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
-        .allow_methods(tower_http::cors::Any)
+        .allow_methods([Method::GET, Method::POST])
         .allow_headers(tower_http::cors::Any);
 
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
