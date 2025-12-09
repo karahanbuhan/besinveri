@@ -1,6 +1,7 @@
 import requests
 import json
 import sys
+import time
 
 def test_sql_injection_protection():
     print("SQL Injection test ediliyor...")
@@ -187,6 +188,7 @@ def main():
     connection_error = False
 
     for test in tests:
+        time.sleep(1)
         try:
             if test():
                 passed += 1

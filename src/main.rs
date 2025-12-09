@@ -12,7 +12,7 @@ use axum_helmet::{Helmet, HelmetLayer};
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
-use reqwest::{Method, header::X_FRAME_OPTIONS};
+use reqwest::Method;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;

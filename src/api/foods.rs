@@ -219,17 +219,18 @@ fn sanitize_input(s: &str) -> Result<(), APIError> {
     // Normal bir yemek isminde olmaması gereken karakterler var mı diye de bakalım.
     // Bu karakterler kullanılsa dahi sorun olmaması lazım, yine de önlemimizi alalım.
     if s.contains("..")
-        || s.contains('/')
-        || s.contains('\\')
-        || s.contains('\0')
-        || s.contains(';')
-        || s.contains('*')
+        || s.contains("/")
+        || s.contains("\\")
+        || s.contains("\0")
+        || s.contains(";")
+        || s.contains("*")
         || s.contains("--")
         || s.contains("/*")
         || s.contains("*/")
         || s.contains("'")
-        || s.contains('\"')
-        || s.contains('\\')
+        || s.contains("\"")
+        || s.contains("\\")
+        || s.trim().is_empty()
     {
         return Err(APIError::new(
             StatusCode::BAD_REQUEST,
