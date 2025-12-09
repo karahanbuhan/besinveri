@@ -233,7 +233,7 @@ fn sanitize_input(s: &str) -> Result<(), APIError> {
     {
         return Err(APIError::new(
             StatusCode::BAD_REQUEST,
-            "Slug geçersiz karakterler içeriyor",
+            "Sorgu geçersiz karakterler içeriyor",
         ));
     }
 
