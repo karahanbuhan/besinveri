@@ -8,10 +8,11 @@ use axum::{
     routing::get,
 };
 use axum_governor::GovernorLayer;
+use axum_helmet::{Helmet, HelmetLayer};
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
-use reqwest::Method;
+use reqwest::{Method, header::X_FRAME_OPTIONS};
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
@@ -123,5 +124,22 @@ fn api_router(shared_state: SharedState) -> Router {
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
                 .layer(GovernorLayer::default()), // Bu katman rate limiter için
         )
+        .layer(HelmetLayer::new(
+            // Özellikle başkalarının iframe içinde API'yi kullanamaması için bu katmanı ekliyoruz
+            Helmet::new()
+                .add(helmet_core::XContentTypeOptions::nosniff())
+                .add(helmet_core::XFrameOptions::deny())
+                .add(helmet_core::XXSSProtection::on().mode_block()) // Eski tarayıcılar için gerekli
+                .add(
+                    helmet_core::ContentSecurityPolicy::new()
+                        .default_src(vec!["'none'"])
+                        .script_src(vec!["'self'"])
+                        .style_src(vec!["'self'", "'unsafe-inline"])
+                        .img_src(vec!["'self'", "data:"])
+                        .connect_src(vec!["'self'"])
+                        .frame_ancestors(vec!["'none"]),
+                )
+                .add(helmet_core::ReferrerPolicy::no_referrer()),
+        ))
         .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
 }

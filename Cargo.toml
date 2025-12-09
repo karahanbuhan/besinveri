@@ -13,7 +13,9 @@ license = "MIT"
 anyhow = "1.0.99"
 axum = { version = "0.8.4", features = ["macros"] }
 axum-governor = "1.0.2"
+axum-helmet = "0.2.0"
 chrono = "0.4.42"
+helmet-core = "0.2.0"
 lazy-limit = "1.0.1"
 moka = { version = "0.12.11", features = ["future"] }
 real = { version = "0.1.4", features = ["axum"] }
