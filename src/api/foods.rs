@@ -20,6 +20,16 @@ pub(crate) async fn food(
     Path(slug): Path<String>,
     State(shared_state): State<SharedState>,
 ) -> Result<Json<Food>, APIError> {
+    // Girilen yemek isminin, istediğimiz limitler içinde olduğuna emin olalım, DoS'a karşı karakter limiti ekleyelim.
+    if slug.is_empty() || slug.len() > 100 {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Slug en az 1 karakter, en fazla 100 karakterden oluşabilir",
+        ));
+    }
+
+    sanitize_input(&slug)?;
+
     let mut food = database::select_food_by_slug(&*shared_state.api_db.lock().await, slug)
         .await
         .map_err(|e| {
@@ -157,6 +167,8 @@ pub(crate) async fn foods_search(
         ));
     }
 
+    sanitize_input(&params.q)?;
+
     let mut foods = match mode.as_str() {
         // İsim ile aratmada ayrıca sıralıyoruz benzerliğine göre
         "description" | "name" => {
@@ -201,6 +213,32 @@ pub(crate) async fn foods_search(
     fix_image_urls(&State(shared_state), &mut foods).await;
 
     Ok(Json(foods))
+}
+
+fn sanitize_input(s: &str) -> Result<(), APIError> {
+    // Normal bir yemek isminde olmaması gereken karakterler var mı diye de bakalım.
+    // Bu karakterler kullanılsa dahi sorun olmaması lazım, yine de önlemimizi alalım.
+    if s.contains("..")
+        || s.contains("/")
+        || s.contains("\\")
+        || s.contains("\0")
+        || s.contains(";")
+        || s.contains("*")
+        || s.contains("--")
+        || s.contains("/*")
+        || s.contains("*/")
+        || s.contains("'")
+        || s.contains("\"")
+        || s.contains("\\")
+        || s.trim().is_empty()
+    {
+        return Err(APIError::new(
+            StatusCode::BAD_REQUEST,
+            "Sorgu geçersiz karakterler içeriyor",
+        ));
+    }
+
+    Ok(())
 }
 
 async fn fix_image_urls(State(shared_state): &State<SharedState>, foods: &mut Vec<Food>) {

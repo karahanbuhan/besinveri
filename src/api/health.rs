@@ -64,8 +64,8 @@ pub(crate) async fn health(
             internet_connection: is_connected_to_internet,
             database_functionality: is_database_functional,
         },
-        documentation: "https://github.com/karahanbuhan/besinveri",
-        source_code: "https://github.com/karahanbuhan/besinveri",
+        documentation: "https://github.com/karahanbuhan/besinveri-api",
+        source_code: "https://github.com/karahanbuhan/besinveri-api",
         last_updated: timestamp,
     };
 

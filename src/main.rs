@@ -8,13 +8,15 @@ use axum::{
     routing::get,
 };
 use axum_governor::GovernorLayer;
+use axum_helmet::{Helmet, HelmetLayer};
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
+use reqwest::Method;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
-use tower_http::normalize_path::NormalizePathLayer;
+use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer};
 
 use crate::core::config::Config;
 
@@ -85,9 +87,16 @@ async fn main() -> Result<(), Error> {
         Router::new().nest(&api_path, api_router(shared_state))
     };
 
+    // Web Uygulamalarda tarayıcıların sorun çıkartmaması için CORS header mekanizmasını da ekliyoruz
+    let cors = CorsLayer::new()
+        .allow_origin(tower_http::cors::Any)
+        .allow_methods([Method::GET])
+        .allow_headers(tower_http::cors::Any)
+        .max_age(std::time::Duration::from_secs(3600));
+
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
-        NormalizePathLayer::trim_trailing_slash().layer(router),
+        NormalizePathLayer::trim_trailing_slash().layer(router.layer(cors)),
     );
 
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
@@ -115,5 +124,22 @@ fn api_router(shared_state: SharedState) -> Router {
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
                 .layer(GovernorLayer::default()), // Bu katman rate limiter için
         )
+        .layer(HelmetLayer::new(
+            // Özellikle başkalarının iframe içinde API'yi kullanamaması için bu katmanı ekliyoruz
+            Helmet::new()
+                .add(helmet_core::XContentTypeOptions::nosniff())
+                .add(helmet_core::XFrameOptions::deny())
+                .add(helmet_core::XXSSProtection::on().mode_block()) // Eski tarayıcılar için gerekli
+                .add(
+                    helmet_core::ContentSecurityPolicy::new()
+                        .default_src(vec!["'none'"])
+                        .script_src(vec!["'self'"])
+                        .style_src(vec!["'self'", "'unsafe-inline"])
+                        .img_src(vec!["'self'", "data:"])
+                        .connect_src(vec!["'self'"])
+                        .frame_ancestors(vec!["'none"]),
+                )
+                .add(helmet_core::ReferrerPolicy::no_referrer()),
+        ))
         .layer(middleware::from_fn(api::error::handle_axum_rejections)) // Bu da axum'un kendi hataları için, özellikle deserializasyon gibi hatalar için JSON çevirici
 }
