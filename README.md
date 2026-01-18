@@ -1,7 +1,28 @@
 # BesinVeri
 Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan açık ve ücretsiz bir REST API. 
 
-#### Şu anda geliştirme aşamasındadır ve kullanıma hazır değildir. API aktif olduğunda burası güncellenecektir.
+#### Önemli Not: Bu API şu anda erken test aşamasındadır (v0.1.0). Veritabanında yalnızca test amaçlı sınırlı sayıda (4-5 adet) besin bulunmaktadır. Servis kararlılığı ve veri doğruluğu geliştirme süreci boyunca değişiklik gösterebilir.
+
+## Örnek Kullanım
+```Python
+import requests
+
+# Muz'u arat ve ilk sonucu al
+muz = requests.get("https://api.besinveri.com/foods/search?q=muz").json()[0]
+
+# Sonucu yazdır: Muz: 89 kcal, 358 mg Potasyum
+print(f"{muz['description']}: {muz['energy']} kcal, {muz['potassium']} mg Potasyum")
+```
+
+## Bağlantı Noktaları (Endpoints)
+
+| Açıklama | Metot | Endpoint / URL |
+| :--- | :---: | :--- |
+| **Sistem Durumu** | `GET` | `https://api.besinveri.com/health` |
+| **Besin Detayı** | `GET` | `https://api.besinveri.com/food/{slug}` |
+| **Tüm Liste** | `GET` | `https://api.besinveri.com/foods/list` |
+| **Arama** | `GET` | `https://api.besinveri.com/foods/search?q={query}&mode={mode}&limit={limit}` |
+| **Etiketler** | `GET` | `https://api.besinveri.com/tags` |
 
 ## Gereksinimler
 - [Git](https://git-scm.com/downloads)
