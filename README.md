@@ -28,6 +28,12 @@ print([f['description'] for f in turuncular])
 | **Arama** | `GET` | `https://api.besinveri.com/foods/search?q={query}&mode={mode}&limit={limit}` |
 | **Etiketler** | `GET` | `https://api.besinveri.com/tags` |
 
+## Kaynak Verimliliği
+Proje mimarisinde Rust ve Axum tercih edilerek, minimum donanım kaynağı (memory footprint) ile yüksek ölçeklenebilirlik hedeflenmiştir. Konteynerize ortamda (Docker) yapılan testlerde, API servisi 'idle' durumdayken ortalama 1.5 MiB RAM tüketimi ile çalışmaktadır. Bu, geleneksel backend teknolojilerine kıyasla sistem yükünü minimize eder.
+
+<img width="1505" height="61" alt="image" src="https://github.com/user-attachments/assets/fb662127-1426-4d30-8ded-5844ad7129dc" />
+
+
 ## Gereksinimler
 - [Git](https://git-scm.com/downloads)
 - [Rust Programlama Dili ve Cargo](https://www.rust-lang.org/tools/install)
