@@ -7,11 +7,15 @@ Türkiye'deki gıdaların kalori, makro, mineral ve vitamin değerlerini sunan a
 ```Python
 import requests
 
-# Muz'u arat ve ilk sonucu al
+# "Muz" araması yap ve ilk sonucu al:
 muz = requests.get("https://api.besinveri.com/foods/search?q=muz").json()[0]
-
-# Sonucu yazdır: Muz: 89 kcal, 358 mg Potasyum
 print(f"{muz['description']}: {muz['energy']} kcal, {muz['potassium']} mg Potasyum")
+# Çıktı: Muz: 89 kcal, 358 mg Potasyum
+
+# "Turuncu" etiketli besinlerin listesini al:
+turuncular = requests.get("https://api.besinveri.com/foods/search?q=turuncu&mode=tag").json()
+print([f['description'] for f in turuncular])
+# Çıktı: ['Portakal', 'Havuç']
 ```
 
 ## Bağlantı Noktaları (Endpoints)
