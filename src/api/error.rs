@@ -83,6 +83,7 @@ pub(crate) async fn handle_axum_rejections(
     }
     /* let Some içindeki veri aynı koşul içerisinde kullanılamıyormuş mevcut sürümde, üstteki match yapısına geçilmiştir
     https://github.com/rust-lang/rust/issues/53667
+    
     if let Some(content_type) = response.headers().get(CONTENT_TYPE)
         && content_type == HeaderValue::from_static("application/json")
     {
