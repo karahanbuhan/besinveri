@@ -9,8 +9,8 @@ import requests
 
 # "Muz" araması yap ve ilk sonucu al:
 muz = requests.get("https://api.besinveri.com/foods/search?q=muz").json()[0]
-print(f"{muz['description']}: {muz['energy']} kcal, {muz['potassium']} mg Potasyum")
-# Çıktı: Muz: 89 kcal, 358 mg Potasyum
+print(f"{muz['description']} (100gr): {muz['energy']} kcal, {muz['potassium']} mg Potasyum")
+# Çıktı: Muz (100gr): 89 kcal, 358 mg Potasyum
 
 # "Turuncu" etiketli besinlerin listesini al:
 turuncular = requests.get("https://api.besinveri.com/foods/search?q=turuncu&mode=tag").json()
