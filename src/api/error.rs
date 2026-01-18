@@ -74,12 +74,20 @@ pub(crate) async fn handle_axum_rejections(
 ) -> Result<impl IntoResponse, APIError> {
     let response = next.run(request).await;
 
-    // Eğer zaten APIError'ün oluşturduğu bir response ise, yani JSON formatındaysa direkt döndürebilriiz
+    // Eğer zaten APIError'ün oluşturduğu bir response ise, yani JSON formatındaysa direkt döndürebiliriz
+    if match response.headers().get(CONTENT_TYPE) {
+        Some(content_type) => content_type == HeaderValue::from_static("application/json"),
+        _ => false,
+    } {
+        return Ok(response);
+    }
+    /* let Some içindeki veri aynı koşul içerisinde kullanılamıyormuş mevcut sürümde, üstteki match yapısına geçilmiştir
+    https://github.com/rust-lang/rust/issues/53667
     if let Some(content_type) = response.headers().get(CONTENT_TYPE)
         && content_type == HeaderValue::from_static("application/json")
     {
         return Ok(response);
-    }
+    } */
 
     // Deserializasyon hatalarını yakalamak için response status kontrolü
     match response.status() {
