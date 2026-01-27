@@ -52,7 +52,7 @@
             "kümes hayvanı",
             "yüksek protein",
             "ana öğün",
-            "diyest",
+            "diyet",
             "yağsız"
         ],
         "allergens": [],
@@ -172,7 +172,7 @@
         "vitamin_c": 89,
         "vitamin_d": 0,
         "vitamin_e": 0.8,
-        "vitamin_k": 101,
+        "vitamin_k": 0.1,
         "source": "gemini"
     }
 ]
