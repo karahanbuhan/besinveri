@@ -16,6 +16,7 @@ pub(crate) struct Config {
 #[derive(Serialize, Deserialize)]
 pub(crate) struct CoreConfig {
     pub(crate) cache_capacity: u64,
+    pub(crate) tracing_level: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -48,6 +49,7 @@ fn get_default_config() -> Config {
     Config {
         core: CoreConfig {
             cache_capacity: 100,
+            tracing_level: "TRACE".to_owned(),
         },
         api: APIConfig {
             base_url: "https://api.besinveri.com".to_owned(),

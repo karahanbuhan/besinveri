@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use anyhow::Error;
 use axum::{
@@ -52,19 +52,6 @@ impl SharedState {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
-        .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
-        .init();
-
-    // Lazy-limit ile rate-limit ayarlıyoruz, şimdilik basit bir sistem kullanıyoruz; 1 saniyede maksimum 5 istek.
-    // Gelecekte kova mantığına geçilebilir ama şimdilik bu sistemin yeterli olması gerekli
-    init_rate_limiter!(
-        default: RuleConfig::new(Duration::Seconds(1), 5),
-        max_memory: Some(64 * 1024 * 1024) // 64MB maksimum bellek
-    )
-    .await;
-
     let shared_state = SharedState::new().await?;
 
     // http(s)://alanadi.com/API/NEST/PATH -> Bu şekilde girildiğinde /API/NEST/PATH'i kullanacağız nest için
@@ -79,6 +66,25 @@ async fn main() -> Result<(), Error> {
             .map(|(_before, after)| format!("/{}", after))
             .unwrap_or("/".to_owned())
     };
+
+    // Config'den trace seviyesini alıp kullanıyoruz, bunun için yine bir MutexGuard kullandık.
+    {
+        let config_guard = shared_state.config.lock().await;
+        let tracing_level = tracing::Level::from_str(&config_guard.core.tracing_level)
+            .unwrap_or(tracing::Level::TRACE);
+        tracing_subscriber::fmt()
+            .with_max_level(tracing_level)
+            .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
+            .init();
+    }
+
+    // Lazy-limit ile rate-limit ayarlıyoruz, şimdilik basit bir sistem kullanıyoruz; 1 saniyede maksimum 5 istek.
+    // Gelecekte kova mantığına geçilebilir ama şimdilik bu sistemin yeterli olması gerekli
+    init_rate_limiter!(
+        default: RuleConfig::new(Duration::Seconds(1), 5),
+        max_memory: Some(64 * 1024 * 1024) // 64MB maksimum bellek
+    )
+    .await;
 
     // Nest'in içine boş path yazarsak Axum sorun çıkartıyor o yüzden böyle yapıyoruz
     let router = if api_path == "/" {

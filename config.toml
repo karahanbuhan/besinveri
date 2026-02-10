@@ -1,5 +1,6 @@
 [core]
 cache_capacity = 100
+tracing_level = "TRACE"
 
 [api]
 base_url = "https://api.besinveri.com"
