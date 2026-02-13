@@ -4,30 +4,40 @@ pub(crate) fn to_lower_en_kebab_case(s: &str) -> String {
 
 pub(crate) fn to_kebab_case(s: &str) -> String {
     s.to_lowercase()
+        .replace("(", "") // Bazı yemekler "Tavuk Göğsü (Çiğ)" gibi, slug'larda parantez olmasını istemiyoruz
+        .replace(")", "")
         .split_whitespace()
         .collect::<Vec<&str>>()
         .join("-")
 }
 
 pub(crate) fn convert_tr_chars_to_en(s: &str) -> String {
-       let tr_to_en = [
-        ('ç', 'c'), ('Ç', 'C'),
-        ('ğ', 'g'), ('Ğ', 'G'),
-        ('ş', 's'), ('Ş', 'S'),
-        ('ü', 'u'), ('Ü', 'U'),
-        ('ö', 'o'), ('Ö', 'O'),
-        ('ı', 'i'), ('İ', 'I'),
+    let tr_to_en = [
+        ('ç', 'c'),
+        ('Ç', 'C'),
+        ('ğ', 'g'),
+        ('Ğ', 'G'),
+        ('ş', 's'),
+        ('Ş', 'S'),
+        ('ü', 'u'),
+        ('Ü', 'U'),
+        ('ö', 'o'),
+        ('Ö', 'O'),
+        ('ı', 'i'),
+        ('İ', 'I'),
     ];
 
     // Çok performanslı bir metot olmadı, O(n^2), daha iyi bir algoritma arayabiliriz
-    s.chars().map(|c| {
-        // (ç, _) varsa atıyorum, (_, c) alacağız ve new = c olacak, yani karakterin karşılığını almış olacağız
-        if let Some(&(_, new)) = tr_to_en.iter().find(|&&(t, _)| t == c) {
-            new
-        } else {
-            c
-        }
-    }).collect()
+    s.chars()
+        .map(|c| {
+            // (ç, _) varsa atıyorum, (_, c) alacağız ve new = c olacak, yani karakterin karşılığını almış olacağız
+            if let Some(&(_, new)) = tr_to_en.iter().find(|&&(t, _)| t == c) {
+                new
+            } else {
+                c
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@ use axum_helmet::{Helmet, HelmetLayer};
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
+use axum_client_ip::{ClientIpSource};
 use reqwest::Method;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
@@ -127,6 +128,7 @@ fn api_router(shared_state: SharedState) -> Router {
         .route("/foods/list", get(api::foods::foods_list))
         .route("/foods/search", get(api::foods::foods_search))
         .route("/tags", get(api::foods::tags_list))
+        .layer(ClientIpSource::RightmostXForwardedFor.into_extension()) // Caddy gibi reverse proxy yazılımlarından doğru istemci IP'sini almak için gerekli
         .with_state(shared_state.clone())
         .fallback(api::error::APIError::not_found_handler)
         .route_layer(middleware::from_fn_with_state(
