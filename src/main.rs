@@ -128,7 +128,6 @@ fn api_router(shared_state: SharedState) -> Router {
         .route("/foods/list", get(api::foods::foods_list))
         .route("/foods/search", get(api::foods::foods_search))
         .route("/tags", get(api::foods::tags_list))
-        .layer(ClientIpSource::RightmostXForwardedFor.into_extension()) // Caddy gibi reverse proxy yazılımlarından doğru istemci IP'sini almak için gerekli
         .with_state(shared_state.clone())
         .fallback(api::error::APIError::not_found_handler)
         .route_layer(middleware::from_fn_with_state(
@@ -137,6 +136,7 @@ fn api_router(shared_state: SharedState) -> Router {
         ))
         .layer(
             tower::ServiceBuilder::new()
+            .layer(ClientIpSource::RightmostXForwardedFor.into_extension()) // Caddy gibi reverse proxy yazılımlarından doğru istemci IP'sini almak için gerekli
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
                 .layer(GovernorLayer::default()), // Bu katman rate limiter için
         )
