@@ -17,6 +17,7 @@ use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
 use tower::Layer;
 use tower_http::{cors::CorsLayer, normalize_path::NormalizePathLayer};
+use tracing::{debug, info};
 
 use crate::core::config::Config;
 
@@ -52,6 +53,7 @@ impl SharedState {
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    // Bu state içinde veritabanı, config ve cache'i barındırıyor. Diğer route'lardan erişmek için kullanıyoruz asenkron olarak
     let shared_state = SharedState::new().await?;
 
     // http(s)://alanadi.com/API/NEST/PATH -> Bu şekilde girildiğinde /API/NEST/PATH'i kullanacağız nest için
@@ -78,6 +80,7 @@ async fn main() -> Result<(), Error> {
             .init();
     }
 
+    debug!("Rate limiter başlatılıyor.");
     // Lazy-limit ile rate-limit ayarlıyoruz, şimdilik basit bir sistem kullanıyoruz; 1 saniyede maksimum 5 istek.
     // Gelecekte kova mantığına geçilebilir ama şimdilik bu sistemin yeterli olması gerekli
     init_rate_limiter!(
@@ -86,6 +89,7 @@ async fn main() -> Result<(), Error> {
     )
     .await;
 
+    debug!("BesinVeri API hazırlanıyor.");
     // Nest'in içine boş path yazarsak Axum sorun çıkartıyor o yüzden böyle yapıyoruz
     let router = if api_path == "/" {
         api_router(shared_state)
@@ -93,6 +97,7 @@ async fn main() -> Result<(), Error> {
         Router::new().nest(&api_path, api_router(shared_state))
     };
 
+    debug!("CORS mekanizması hazırlanıyor.");
     // Web Uygulamalarda tarayıcıların sorun çıkartmaması için CORS header mekanizmasını da ekliyoruz
     let cors = CorsLayer::new()
         .allow_origin(tower_http::cors::Any)
@@ -100,13 +105,16 @@ async fn main() -> Result<(), Error> {
         .allow_headers(tower_http::cors::Any)
         .max_age(std::time::Duration::from_secs(3600));
 
+    debug!("Trailing slash çözülüyor.");
     // trim_trailing_slash ile /api/ -> /api şeklinde düzeltiyoruz aksi takdirde routelar çalışmıyor, ayrıca IP adreslerine de ihtiyacımız var rate limit için, connect info ayarlıyoruz
     let router = ServiceExt::<Request>::into_make_service_with_connect_info::<SocketAddr>(
         NormalizePathLayer::trim_trailing_slash().layer(router.layer(cors)),
     );
 
+    info!("BesinVeri API aktif!");
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
-
+    info!("BesinVeri API pasif!");
+    
     Ok(())
 }
 
