@@ -1,13 +1,13 @@
 use std::{
-    net::{IpAddr, Ipv4Addr},
-    time::Duration,
+    net::{IpAddr, Ipv4Addr, SocketAddr}, time::Duration
 };
 
-use axum::{Json, extract::State};
+use axum::{Json, extract::{ConnectInfo, State}};
 use chrono::{FixedOffset, Utc};
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use tracing::{debug};
 
 use crate::SharedState;
 
@@ -33,6 +33,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub(crate) async fn health(
     State(shared_state): State<SharedState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>
 ) -> Json<ServerHealth> {
     let timestamp = {
         let utc_time = Utc::now();
@@ -69,6 +70,7 @@ pub(crate) async fn health(
         last_updated: timestamp,
     };
 
+    debug!("GET /health: ({}), {}", health.status, addr);
     Json(health)
 }
 

@@ -7,12 +7,12 @@ use axum::{
     middleware::{self},
     routing::get,
 };
+use axum_client_ip::ClientIpSource;
 use axum_governor::GovernorLayer;
 use axum_helmet::{Helmet, HelmetLayer};
 use lazy_limit::{Duration, RuleConfig, init_rate_limiter};
 use moka::future::Cache;
 use real::RealIpLayer;
-use axum_client_ip::{ClientIpSource};
 use reqwest::Method;
 use sqlx::{Pool, Sqlite};
 use tokio::{net::TcpListener, sync::Mutex};
@@ -115,7 +115,7 @@ async fn main() -> Result<(), Error> {
     info!("BesinVeri API aktif!");
     axum::serve(TcpListener::bind("0.0.0.0:8099").await?, router).await?;
     info!("BesinVeri API pasif!");
-    
+
     Ok(())
 }
 
@@ -136,7 +136,7 @@ fn api_router(shared_state: SharedState) -> Router {
         ))
         .layer(
             tower::ServiceBuilder::new()
-            .layer(ClientIpSource::RightmostXForwardedFor.into_extension()) // Caddy gibi reverse proxy yazılımlarından doğru istemci IP'sini almak için gerekli
+                .layer(ClientIpSource::RightmostXForwardedFor.into_extension()) // Caddy gibi reverse proxy yazılımlarından doğru istemci IP'sini almak için gerekli
                 .layer(RealIpLayer::default()) // Governor'dan önce kurulmalı
                 .layer(GovernorLayer::default()), // Bu katman rate limiter için
         )
