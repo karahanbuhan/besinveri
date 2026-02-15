@@ -1,15 +1,20 @@
 use std::{
-    net::{IpAddr, Ipv4Addr, SocketAddr}, time::Duration
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    time::Duration,
 };
 
-use axum::{Json, extract::{ConnectInfo, State}};
+use axum::{
+    Json,
+    extract::{ConnectInfo, State},
+    http::HeaderMap,
+};
 use chrono::{FixedOffset, Utc};
 use reqwest::ClientBuilder;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use tracing::{debug};
+use tracing::debug;
 
-use crate::SharedState;
+use crate::{SharedState, api::parse_client_ip};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub(crate) struct ServerHealth {
@@ -33,7 +38,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub(crate) async fn health(
     State(shared_state): State<SharedState>,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
 ) -> Json<ServerHealth> {
     let timestamp = {
         let utc_time = Utc::now();
@@ -70,7 +76,9 @@ pub(crate) async fn health(
         last_updated: timestamp,
     };
 
-    debug!("GET /health: ({}), {}", health.status, addr);
+    let client_ip = parse_client_ip(&addr, &headers);
+    
+    debug!("GET /health: ({}), {}", health.status, client_ip);
     Json(health)
 }
 

@@ -56,7 +56,7 @@ impl SharedState {
 async fn main() -> Result<(), Error> {
     // Bu state içinde veritabanı, config ve cache'i barındırıyor. Diğer route'lardan erişmek için kullanıyoruz asenkron olarak
     let shared_state = SharedState::new().await?;
-
+    
     // http(s)://alanadi.com/API/NEST/PATH -> Bu şekilde girildiğinde /API/NEST/PATH'i kullanacağız nest için
     // Scope içine açıyorum ownership sorununu düzeltmek için, ayrıca String kullanmamız gerekecek referans kullanamayız burada
     let api_path: String = {
